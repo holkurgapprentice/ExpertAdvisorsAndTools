@@ -36,7 +36,8 @@ input ENUM_TIMEFRAMES tradeTimeFrame = PERIOD_M5;
 input ENUM_TIMEFRAMES trendTimeFrame = PERIOD_H1;
 input int fastGetSLPoints = 100;
 input bool isFastGet = true;
-input int maFilterTrendPoints = 20; // maFilterTrendPoints 0 off
+input int maFilterTrendPoints = 20; // MA Trend Filter Points 0 off
+input int maFilterTradePoints = 20; // MA Trade Filter Points 0 off
 input double runOutPercent = 0.5;
 
 //+------------------------------------------------------------------+
@@ -251,7 +252,7 @@ void DeleteOldOrder(int orderTicket) {
 }
 
 void HandleUpTrend() {
-   if (maFast[0] > maMiddle[0] && maMiddle[0] > maSlow[0]) {
+   if (maFast[0] > maMiddle[0] && maMiddle[0] > maSlow[0] && maFast[0] - maSlow[0] > maFilterTradePoints * _Point) {
       // look only at completed bars, so we look on previous (completed one)
       double priceBottomLastBar = iLow(_Symbol, tradeTimeFrame, 1);
    
@@ -277,7 +278,7 @@ void HandleUpTrend() {
 }
 
 void HandleDownTrend() {
-   if (maFast[0] < maMiddle[0] && maMiddle[0] < maSlow[0]) {
+   if (maFast[0] < maMiddle[0] && maMiddle[0] < maSlow[0] && maSlow[0] - maFast[0] > maFilterTradePoints * _Point) {
       // look only at completed bars, so we look on previous (completed one)
       double priceHighestLastBar = iHigh(_Symbol, tradeTimeFrame, 1);
       if (priceHighestLastBar >= maFast[0] && priceHighestLastBar <= maSlow[0]) {
