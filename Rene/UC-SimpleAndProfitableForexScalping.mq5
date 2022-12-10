@@ -213,7 +213,7 @@ void TrailSlBuy(int posTicket) {
 }
 
 void TrailSlSell(int posTicket) {
-   int highest = iHighest(_Symbol, tradeTimeFrame, MODE_LOW, 3, 0);
+   int highest = iHighest(_Symbol, tradeTimeFrame, MODE_HIGH, 3, 0);
    double sl = iHigh(_Symbol, tradeTimeFrame, highest);
    sl = NormalizeDouble(sl, _Digits);
    
@@ -224,7 +224,7 @@ void TrailSlSell(int posTicket) {
    double stopLossCurrentPriceDistance = (sl - bid) / _Point;
    
    if (stopLossCurrentPriceDistance > fastGetSLPoints && isFastGet) {
-      sl = bid - ((stopLossCurrentPriceDistance / 2) * _Point);
+      sl = bid + ((stopLossCurrentPriceDistance / 2) * _Point);
       sl = NormalizeDouble(sl, _Digits);
    }
    if (!trade.PositionModify(posTicket, sl, 0)) {
