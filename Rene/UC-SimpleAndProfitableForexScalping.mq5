@@ -29,16 +29,21 @@ int orders = 0;
 
 // Inputs from user
 input int eaMagic = 22;
-input double eaLots = 0.05;
+input double eaLots = 0.7;
 input bool tryTrade = false;
 input int ordersLiveMinutes = 30;
 input ENUM_TIMEFRAMES tradeTimeFrame = PERIOD_M5;
 input ENUM_TIMEFRAMES trendTimeFrame = PERIOD_H1;
-input int fastGetSLPoints = 100;
-input bool isFastGet = true;
-input int maFilterTrendPoints = 20; // MA Trend Filter Points 0 off
-input int maFilterTradePoints = 20; // MA Trade Filter Points 0 off
-input double runOutPercent = 0.5;
+input int fastGetSLPoints = 2600;
+input bool isFastGet = false;
+input int maFilterTrendPoints = 0; // MA Trend Filter Points 0 off
+input int maFilterTradePoints = 0; // MA Trade Filter Points 0 off
+input int emaTradeFast = 8; // EMA Fast used on trade decision
+input int emaTradeMiddle = 13; // EMA Middle used on trade decision
+input int emaTradeSlow = 21; // EMA Slow used on trade decision
+input int emaTrendFast = 8; // EMA Fast used on trend UP / DOWN direction
+input int emaTrendSlow = 21; // EMA Slow used on trend UP / DOWN direction
+input double runOutPercent = 0.4;
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
@@ -46,12 +51,12 @@ input double runOutPercent = 0.5;
 int OnInit() {
    trade.SetExpertMagicNumber(eaMagic);
 
-   handleTrendMaFast = iMA(_Symbol, trendTimeFrame, 8, 0, MODE_EMA, PRICE_CLOSE);
-   handleTrendMaSlow = iMA(_Symbol, trendTimeFrame, 21, 0, MODE_EMA, PRICE_CLOSE);
+   handleTrendMaFast = iMA(_Symbol, trendTimeFrame, emaTrendFast, 0, MODE_EMA, PRICE_CLOSE);
+   handleTrendMaSlow = iMA(_Symbol, trendTimeFrame, emaTrendSlow, 0, MODE_EMA, PRICE_CLOSE);
 
-   handleMaFast = iMA(_Symbol, tradeTimeFrame, 8, 0, MODE_EMA, PRICE_CLOSE);
-   handleMaMiddle = iMA(_Symbol, tradeTimeFrame, 13, 0, MODE_EMA, PRICE_CLOSE);
-   handleMaSlow = iMA(_Symbol, tradeTimeFrame, 21, 0, MODE_EMA, PRICE_CLOSE);
+   handleMaFast = iMA(_Symbol, tradeTimeFrame, emaTradeFast, 0, MODE_EMA, PRICE_CLOSE);
+   handleMaMiddle = iMA(_Symbol, tradeTimeFrame, emaTradeMiddle, 0, MODE_EMA, PRICE_CLOSE);
+   handleMaSlow = iMA(_Symbol, tradeTimeFrame, emaTradeSlow, 0, MODE_EMA, PRICE_CLOSE);
    return (INIT_SUCCEEDED);
 }
 //+------------------------------------------------------------------+
@@ -138,7 +143,7 @@ void LoopOnPositions() {
                if (PositionGetDouble(POSITION_VOLUME) >= eaLots) {
                   CloseHalfBuyTrade(posTicket);                 
                } else {
-                  TrailSlBuy(posTicket);
+                  //TrailSlBuy(posTicket);
                }
             }
             
@@ -146,7 +151,7 @@ void LoopOnPositions() {
                if (PositionGetDouble(POSITION_VOLUME) >= eaLots) {
                   CloseHalfSellTrade(posTicket);                 
                } else {
-                  TrailSlSell(posTicket);
+                  //TrailSlSell(posTicket);
                }
             }
          }
@@ -163,14 +168,18 @@ void CloseHalfBuyTrade(int posTicket){
 
    if (bid >= tp) {
       if (trade.PositionClosePartial(posTicket, NormalizeDouble(PositionGetDouble(POSITION_VOLUME) / 2, 2))) {
-         double sl = PositionGetDouble(POSITION_PRICE_OPEN);
-         sl = NormalizeDouble(sl, _Digits);
-         trade.PositionModify(posTicket, sl, 0);
+         double priceOpen = PositionGetDouble(POSITION_PRICE_OPEN);
+         priceOpen = NormalizeDouble(priceOpen, _Digits);
+         
+         tp = priceOpen + 2 * diferencePrice;
+         tp = NormalizeDouble(tp, _Digits);
+       
+         trade.PositionModify(posTicket, priceOpen, tp);
       }
    } else if (bid >= halfTp) {
-      double sl = PositionGetDouble(POSITION_PRICE_OPEN);
-      sl = NormalizeDouble(sl, _Digits);
-      trade.PositionModify(posTicket, sl, 0);
+      //double sl = PositionGetDouble(POSITION_PRICE_OPEN);
+      //sl = NormalizeDouble(sl, _Digits);
+      //trade.PositionModify(posTicket, sl, 0);
    }
 }
 
@@ -182,14 +191,18 @@ void CloseHalfSellTrade(int posTicket){
 
    if (bid <= tp) {
       if (trade.PositionClosePartial(posTicket, NormalizeDouble(PositionGetDouble(POSITION_VOLUME) / 2, 2))) {
-         double sl = PositionGetDouble(POSITION_PRICE_OPEN);
-         sl = NormalizeDouble(sl, _Digits);
-         trade.PositionModify(posTicket, sl, 0);
+         double priceOpen = PositionGetDouble(POSITION_PRICE_OPEN);
+         priceOpen = NormalizeDouble(priceOpen, _Digits);
+         
+         tp = priceOpen - 2 * diferencePrice;
+         tp = NormalizeDouble(tp, _Digits);
+         
+         trade.PositionModify(posTicket, priceOpen, tp);
       }
    } else if (bid <= halfTp) {
-      double sl = PositionGetDouble(POSITION_PRICE_OPEN);
-         sl = NormalizeDouble(sl, _Digits);
-         trade.PositionModify(posTicket, sl, 0);
+      //double sl = PositionGetDouble(POSITION_PRICE_OPEN);
+      //sl = NormalizeDouble(sl, _Digits);
+      //trade.PositionModify(posTicket, sl, 0);
    }
 }
 
