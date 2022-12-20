@@ -33,7 +33,7 @@ void OnTick() {
    double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
 
    if (bid >= dcUpper[0]) {
-      Print(__FUNCTION__, " > Buy signal...");
+      //Print(__FUNCTION__, " > Buy signal...");
 
       if (posTicket > 0) {
          if (PositionSelectByTicket(posTicket)) {
@@ -56,7 +56,7 @@ void OnTick() {
          }
       }
    } else if (bid <= dcLower[0]) {
-      Print(__FUNCTION__, " > Sell signal...");
+      //Print(__FUNCTION__, " > Sell signal...");
 
       if (posTicket > 0) {
          if (PositionSelectByTicket(posTicket)) {
