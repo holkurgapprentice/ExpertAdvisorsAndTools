@@ -3,24 +3,23 @@
 input double Lots = 0.1;
 input double LotsFactor = 1.3;
 input int IncreasePoints = 1000;
+input double inputLostMoney = 0;
+input int inputLostPoints = 0;
+input int magicNumber = 789;
 
 CTrade trade;
 
+double lostMoney = 0;
+int lostPoints = 0;
+
 int handleDc;
 ulong posTicket;
-
-double lostMoney;
-int lostPoints;
 
 int OnInit() {
 
    handleDc = iCustom(_Symbol, PERIOD_CURRENT, "DonchianChannel.ex5", 20);
 
    return (INIT_SUCCEEDED);
-}
-
-void OnDeinit(const int reason) {
-
 }
 
 void OnTick() {
