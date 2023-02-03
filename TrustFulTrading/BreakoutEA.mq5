@@ -19,6 +19,12 @@ enum LOT_MODE_ENUM {
 input LOT_MODE_ENUM InpLotMode = LOT_MODE_FIXED;
 input double InpLots = 0.01;
 
+enum STOP_LOSS_ENUM {
+  NEGATIVE_END_CHANNEL,
+  HALF_CHANNEL,
+  VALUE
+};
+input STOP_LOSS_ENUM InpStopLossMode = VALUE;
 input int InpStopLoss = 150;
 input int InpTakeProfit = 200;
 
@@ -256,13 +262,31 @@ void CheckBreakouts() {
       if (InpBreakoutMode == ONE_SIGNAL) {
         range.f_low_breakout = true;
       }
-
+      
+      double sl;
       // calc sl tp
-      double sl =
-        InpStopLoss == 0 ? 0 : NormalizeDouble(
+      if (InpStopLossMode == VALUE) 
+      {
+         sl = InpStopLoss == 0 ? 0 : NormalizeDouble(
           lastTick.bid - ((range.high - range.low) *
             InpStopLoss * 0.01),
           _Digits);
+      }
+      if (InpStopLossMode == HALF_CHANNEL) 
+      {
+         sl = NormalizeDouble(
+          ((range.high - range.low) / 2) + range.low,
+          _Digits);
+      }
+      
+      if (InpStopLossMode == NEGATIVE_END_CHANNEL) 
+      {
+         sl = NormalizeDouble(
+          range.low,
+          _Digits);
+      }
+   
+   
       double tp =
         InpTakeProfit == 0 ?
         0 :
@@ -288,11 +312,28 @@ void CheckBreakouts() {
       }
 
       // calc sl tp
-      double sl =
-        InpStopLoss == 0 ? 0 : NormalizeDouble(
+      double sl;
+      if (InpStopLossMode == VALUE) 
+      {
+         sl = InpStopLoss == 0 ? 0 : NormalizeDouble(
           lastTick.ask + ((range.high - range.low) *
             InpStopLoss * 0.01),
           _Digits);
+      }
+      if (InpStopLossMode == HALF_CHANNEL) 
+      {
+         sl = NormalizeDouble(
+          range.high - (range.high - range.low),
+          _Digits);
+      }
+      
+      if (InpStopLossMode == NEGATIVE_END_CHANNEL) 
+      {
+         sl = NormalizeDouble(
+          range.high,
+          _Digits);
+      }
+      
       double tp =
         InpTakeProfit == 0 ?
         0 :
@@ -436,15 +477,33 @@ bool CalculateLots(double slDistance, double &lots) {
   lots = 0.0;
   if (InpLotMode == LOT_MODE_FIXED) {
     lots = InpLots;
-  } else {
+  } 
+  if (InpLotMode == LOT_MODE_MONEY || InpLotMode == LOT_MODE_PCT_ACCOUNT) {
     double tickSize = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
     double tickValue = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE);
     double volumeStep = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_STEP);
 
-    double riskMoney = InpLotMode == LOT_MODE_MONEY ?
-      InpLots :
-      AccountInfoDouble(ACCOUNT_EQUITY) * InpLots * 0.01;
+    double riskMoney;
+    
+    if (InpLotMode == LOT_MODE_MONEY) {
+      riskMoney = InpLots; // should contain money value ex: 50 in usd 
+    }
+    
+    if (InpLotMode == LOT_MODE_PCT_ACCOUNT) {
+      riskMoney = AccountInfoDouble(ACCOUNT_EQUITY) * InpLots * 0.01; // should contain percent ex 14 value for 14 % of account
+    }
+    
+    if (tickSize == 0) {
+      Print("tickSize equal 0");
+      tickSize = 1;
+    }
+    
     double moneyVolumeStep = (slDistance / tickSize) * tickValue * volumeStep;
+    
+    if (moneyVolumeStep == 0) { 
+      Print("ERR: moneyVolumeStep equal 0");
+      return false;
+    }
 
     lots = MathFloor(riskMoney / moneyVolumeStep) * volumeStep;
   }
@@ -461,6 +520,14 @@ bool CheckLots(double &lots) {
   double max = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MAX);
   double step = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_STEP);
 
+  if (min == 0) {
+    Print("min equal 0");
+  }
+
+  if (max == 0) {
+    Print("max equal 0");
+  }
+
   if (lots < min) {
     Print("Lots below min lots");
     lots = min;
@@ -470,6 +537,11 @@ bool CheckLots(double &lots) {
   if (lots > max) {
     Print("lotst above max");
     return false;
+  }
+  
+  if (step == 0) {
+    Print("step equal 0");
+    step = 1;  
   }
 
   lots = (int) MathFloor(lots / step) * step;
