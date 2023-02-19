@@ -27,9 +27,9 @@ input group "==== Donchain channel ====";
 input int InpPeroid = 21;
 input int InpOffset = 0;
 input color InpColor = clrBlue;
+input int InpSizeFilter = 0;
 
-input int InpRSIPeroid = 21;
-input int InpRSILevel = 70;
+
 
 int handle;
 double bufferUpper[];
@@ -120,6 +120,11 @@ void OnTick() {
     return;
   }
   
+  if (InpSizeFilter > 0 && (bufferUpper[0] - bufferLower[0])<InpSizeFilter * _Point) {
+    Print("Filtered out by size filter");
+    return;
+  }
+  
   if (cntBuy == 0 && currentTick.ask <= bufferLower[0] && openTimeBuy!=iTime(_Symbol, PERIOD_CURRENT,0)) {
     openTimeBuy = iTime(_Symbol, PERIOD_CURRENT,0);
     if (InpCloseSignal) {
@@ -136,8 +141,8 @@ void OnTick() {
       tp = InpTakeProfit ==0 ? 0 : currentTick.bid + (bufferUpper[0]-bufferLower[0]) * InpTakeProfit * 0.01;
     }
     if(InpSLTPMode==SL_TP_MODE_POINTS) { 
-      sl = InpStopLoss ==0 ? 0 : currentTick.bid - InpStopLoss;
-      tp = InpTakeProfit ==0 ? 0 : currentTick.bid + InpTakeProfit;
+      sl = InpStopLoss ==0 ? 0 : currentTick.bid - InpStopLoss * _Point;
+      tp = InpTakeProfit ==0 ? 0 : currentTick.bid + InpTakeProfit * _Point;
     }
     
     if (!NormalizePrice(sl)) {
@@ -165,8 +170,8 @@ void OnTick() {
       tp = InpTakeProfit ==0 ? 0 : currentTick.ask - (bufferUpper[0]-bufferLower[0]) * InpTakeProfit * 0.01;
     }
     if(InpSLTPMode==SL_TP_MODE_POINTS) { 
-      sl = InpStopLoss ==0 ? 0 : currentTick.ask + InpStopLoss;
-      tp = InpTakeProfit ==0 ? 0 : currentTick.ask - InpTakeProfit;
+      sl = InpStopLoss ==0 ? 0 : currentTick.ask + InpStopLoss * _Point;
+      tp = InpTakeProfit ==0 ? 0 : currentTick.ask - InpTakeProfit * _Point;
     }
     
     if (!NormalizePrice(sl)) {
