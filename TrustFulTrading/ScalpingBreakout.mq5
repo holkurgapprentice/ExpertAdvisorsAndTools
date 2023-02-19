@@ -21,62 +21,28 @@ input bool InpTrailingSl = true;
 input int InpTakeProfit = 0;
 
 double high = 0;
-
+double low = 0;
+int highIdx = 0;
+int lowIdx = 0;
+MqlTick currentTick, previousTick;
+CTrade trade;
 
 int OnInit() {
-  if (InpMagicNumber <= 0) {
-    Alert("InpMagicNumber <= 0");
-    return INIT_PARAMETERS_INCORRECT;
-  }
-
-  if (InpLotSize <= 0 || InpLotSize > 10) {
-    Alert("InpLotSize <= 0 || InpLotSize > 10");
-    return INIT_PARAMETERS_INCORRECT;
-  }
-
-  if (InpStopLoss < 0) {
-    Alert("InpStopLoss < 0");
-    return INIT_PARAMETERS_INCORRECT;
-  }
-
-  if (InpStopLoss == 0 && !InpCloseSignal) {
-    Alert("No stop loss and no close signal");
-    return INIT_PARAMETERS_INCORRECT;
-  }
-
-  if (InpPeroid <= 1) {
-    Alert("Donchain peroid <= 1");
-    return INIT_PARAMETERS_INCORRECT;
-  }
-
-  if (InpOffset < 0 || InpOffset >= 50) {
-    Alert("InpOffset < 0 || InpOffset >= 50");
+  if (!CheckInputs()) {
     return INIT_PARAMETERS_INCORRECT;
   }
 
   trade.SetExpertMagicNumber(InpMagicNumber);
 
-  handle = iCustom(_Symbol, PERIOD_CURRENT, INDICATOR_NAME, InpPeroid, InpOffset, InpColor);
-  if (handle == INVALID_HANDLE) {
-    Alert("Init of indicator failed");
-    return INIT_FAILED;
-  }
-
-  ArraySetAsSeries(bufferUpper, true);
-  ArraySetAsSeries(bufferLower, true);
-
-  ChartIndicatorDelete(NULL, 0, "Donchain(" + IntegerToString(InpPeroid) + ")");
-  ChartIndicatorAdd(NULL, 0, handle);
-
   return (INIT_SUCCEEDED);
 }
+
 void OnDeinit(const int reason) {
 
-  if (handle != INVALID_HANDLE) {
-    ChartIndicatorDelete(NULL, 0, "Donchain(" + IntegerToString(InpPeroid) + ")");
-    IndicatorRelease(handle);
-  }
-
+  ObjectDelete(NULL, "high");
+  ObjectDelete(NULL, "low");
+  ObjectDelete(NULL, "text");
+  ObjectDelete(NULL, "indexFilter");
 }
 
 void OnTick() {
@@ -84,92 +50,130 @@ void OnTick() {
   if (!IsNewBar()) {
     return;
   }
-  
-  if(!SymbolInfoTick(_Symbol, currentTick)) {
+
+  previousTick = currentTick;
+  if (!SymbolInfoTick(_Symbol, currentTick)) {
     Print("Failed to get current tick");
     return;
   }
 
-  int values = CopyBuffer(handle, 0, 0, 1, bufferUpper) + CopyBuffer(handle, 1, 0, 1, bufferLower);
-  if (values!=2) {
-    Print("Failed to get indicator values");
-    return;
-  }
-  
-  Comment("bufferUpper[0]: ", bufferUpper[0], 
-         "bufferLower[0]:", bufferLower[0]);
-         
   int cntBuy, cntSell;
   if (!CountOpenPositions(cntBuy, cntSell)) {
     return;
   }
-  
-  if (InpSizeFilter > 0 && (bufferUpper[0] - bufferLower[0])<InpSizeFilter * _Point) {
-    Print("Filtered out by size filter");
-    return;
-  }
-  
-  if (cntBuy == 0 && currentTick.ask <= bufferLower[0] && openTimeBuy!=iTime(_Symbol, PERIOD_CURRENT,0)) {
-    openTimeBuy = iTime(_Symbol, PERIOD_CURRENT,0);
-    if (InpCloseSignal) {
-      if (!ClosePositions(2)) {
-        return;
-      }
-    }
-    
+
+  if (cntBuy == 0 && high != 0 && previousTick.ask < high && currentTick.ask >= high && CheckIndexFilter(highIdx) && CheckSizeFilter()) {
     double sl = 0;
     double tp = 0;
-    
-    if(InpSLTPMode==SL_TP_MODE_PCT) {
-      sl = InpStopLoss ==0 ? 0 : currentTick.bid - (bufferUpper[0]-bufferLower[0]) * InpStopLoss * 0.01;
-      tp = InpTakeProfit ==0 ? 0 : currentTick.bid + (bufferUpper[0]-bufferLower[0]) * InpTakeProfit * 0.01;
-    }
-    if(InpSLTPMode==SL_TP_MODE_POINTS) { 
-      sl = InpStopLoss ==0 ? 0 : currentTick.bid - InpStopLoss * _Point;
-      tp = InpTakeProfit ==0 ? 0 : currentTick.bid + InpTakeProfit * _Point;
-    }
-    
+
+    sl = InpStopLoss == 0 ? 0 : currentTick.bid - InpStopLoss * _Point;
+    tp = InpTakeProfit == 0 ? 0 : currentTick.bid + InpTakeProfit * _Point;
+
     if (!NormalizePrice(sl)) {
       return;
     }
     if (!NormalizePrice(tp)) {
       return;
     }
-    trade.PositionOpen(_Symbol,ORDER_TYPE_BUY,InpLotSize,currentTick.ask,sl,tp,"Donchain trade");
+    trade.PositionOpen(_Symbol, ORDER_TYPE_BUY, InpLots, currentTick.ask, sl, tp, "Sclaping Breakout trade");
   }
-  
-  if (cntSell == 0 && currentTick.bid >= bufferUpper[0] && openTimeBuy!=iTime(_Symbol, PERIOD_CURRENT,0)) {
-    openTimeSell = iTime(_Symbol, PERIOD_CURRENT,0);
-    if (InpCloseSignal) {
-      if (!ClosePositions(1)) {
-        return;
-      }
-    }
-    
+
+  if (cntSell == 0 && low != 0 && previousTick.bid > low && currentTick.bid <= low && CheckIndexFilter(highIdx) && CheckSizeFilter()) {
     double sl = 0;
     double tp = 0;
-    
-    if(InpSLTPMode==SL_TP_MODE_PCT) {
-      sl = InpStopLoss ==0 ? 0 : currentTick.ask + (bufferUpper[0]-bufferLower[0]) * InpStopLoss * 0.01;
-      tp = InpTakeProfit ==0 ? 0 : currentTick.ask - (bufferUpper[0]-bufferLower[0]) * InpTakeProfit * 0.01;
-    }
-    if(InpSLTPMode==SL_TP_MODE_POINTS) { 
-      sl = InpStopLoss ==0 ? 0 : currentTick.ask + InpStopLoss * _Point;
-      tp = InpTakeProfit ==0 ? 0 : currentTick.ask - InpTakeProfit * _Point;
-    }
-    
+
+    sl = InpStopLoss == 0 ? 0 : currentTick.ask + InpStopLoss * _Point;
+    tp = InpTakeProfit == 0 ? 0 : currentTick.ask - InpTakeProfit * _Point;
+
     if (!NormalizePrice(sl)) {
       return;
     }
     if (!NormalizePrice(tp)) {
       return;
     }
-    trade.PositionOpen(_Symbol,ORDER_TYPE_SELL,InpLotSize,currentTick.bid,sl,tp,"Donchain trade");
+    trade.PositionOpen(_Symbol, ORDER_TYPE_SELL, InpLots, currentTick.bid, sl, tp, "Sclaping Breakout trade");
   }
+
+  if (InpStopLoss > 0 && InpTrailingSl) {
+    UpdateStopLoss(InpStopLoss * _Point);
+  }
+
+  highIdx = iHighest(_Symbol, PERIOD_CURRENT, MODE_HIGH, InpBars, 1);
+  lowIdx = iLowest(_Symbol, PERIOD_CURRENT, MODE_LOW, InpBars, 1);
+  high = iHigh(_Symbol, PERIOD_CURRENT, highIdx);
+  low = iLow(_Symbol, PERIOD_CURRENT, lowIdx);
+
+  DrawObjects();
+}
+
+bool CheckInputs() {
+
+  return true;
+}
+
+bool CheckIndexFilter(int index) {
+
+  if (InpIndexFilter > 0 && (index <= round(InpBars * InpIndexFilter * 0.01) || index > InpBars - round(InpBars * InpIndexFilter * 0.01))) {
+    return false;
+  }
+  return true;
+}
+
+bool CheckSizeFilter() {
+
+  if (InpSizeFilter > 0 && (high - low) > InpSizeFilter * _Point) {
+    return false;
+  }
+  return true;
+}
+
+void DrawObjects() {
+
+  datetime time1 = iTime(_Symbol, PERIOD_CURRENT, InpBars);
+  datetime time2 = iTime(_Symbol, PERIOD_CURRENT, 1);
+
+  //high
+  ObjectDelete(NULL, "high");
+  ObjectCreate(NULL, "high", OBJ_TREND, 0, time1, high, time2, high);
+  ObjectSetInteger(NULL, "high", OBJPROP_WIDTH, 3);
+  ObjectSetInteger(NULL, "high", OBJPROP_COLOR, CheckIndexFilter(highIdx) && CheckSizeFilter() ? clrLime : clrBlack);
+
+  //low
+  ObjectDelete(NULL, "low");
+  ObjectCreate(NULL, "low", OBJ_TREND, 0, time1, low, time2, low);
+  ObjectSetInteger(NULL, "low", OBJPROP_WIDTH, 3);
+  ObjectSetInteger(NULL, "low", OBJPROP_COLOR, CheckIndexFilter(lowIdx) && CheckSizeFilter() ? clrLime : clrBlack);
+
+  //index filter
+  ObjectDelete(NULL, "indexFilter");
+  if (InpIndexFilter > 0) {
+    datetime timeIF1 = iTime(_Symbol, PERIOD_CURRENT, (int)(InpBars - round(InpBars * InpIndexFilter * 0.01)));
+    datetime timeIF2 = iTime(_Symbol, PERIOD_CURRENT, (int)(round(InpBars * InpIndexFilter * 0.01)));
+    ObjectDelete(NULL, "indexFilter");
+    ObjectCreate(NULL, "indexFilter", OBJ_RECTANGLE, 0, timeIF1, low, timeIF2, high);
+    ObjectSetInteger(NULL, "indexFilter", OBJPROP_BACK, true);
+    ObjectSetInteger(NULL, "indexFilter", OBJPROP_FILL, true);
+    ObjectSetInteger(NULL, "indexFilter", OBJPROP_COLOR, clrMintCream);
+  }
+
+  //text
+  ObjectDelete(NULL, "text");
+  ObjectCreate(NULL, "text", OBJ_TEXT, 0, time2, low);
+  ObjectSetInteger(NULL, "text", OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
+  ObjectSetInteger(NULL, "text", OBJPROP_COLOR, clrBlack);
+  ObjectSetString(NULL, "text", OBJPROP_TEXT, "Bars: " + (string) InpBars +
+    " index filter: " + DoubleToString(round(InpBars * InpIndexFilter * 0.01), 0) +
+    " high index: " + (string) highIdx +
+    " low index: " + (string) lowIdx +
+    " size: " + DoubleToString((high - low) / _Point, 0));
+}
+
+void UpdateStopLoss(double slDistance) {
 
 }
 
 bool IsNewBar() {
+
   static datetime previousTime = 0;
   datetime currentTime = iTime(_Symbol, PERIOD_CURRENT, 0);
   if (previousTime != currentTime) {
@@ -179,7 +183,8 @@ bool IsNewBar() {
   return false;
 }
 
-bool CountOpenPositions(int &countBuy, int &countSell) {
+bool CountOpenPositions(int & countBuy, int & countSell) {
+
   countBuy = 0;
   countSell = 0;
   int total = PositionsTotal();
@@ -215,7 +220,7 @@ bool CountOpenPositions(int &countBuy, int &countSell) {
   return true;
 }
 
-bool NormalizePrice(double &normalizedPrice) {
+bool NormalizePrice(double & normalizedPrice) {
   double tickSize = 0;
   if (!SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE, tickSize)) {
     Print("Failed to get tick size");
