@@ -9,33 +9,19 @@
 
 #include <Trade\Trade.mqh>
 
-#define INDICATOR_NAME "Trustful_Donchain"
 
 input group "==== General ====";
-static input long InpMagicNumber = 654654;
-static input double InpLotSize = 0.01;
-enum SL_TP_MODE_ENUM {
-  SL_TP_MODE_PCT,
-  SL_TP_MODE_POINTS
-};
-input SL_TP_MODE_ENUM InpSLTPMode = SL_TP_MODE_PCT;
-input int InpStopLoss = 200;
-input int InpTakeProfit = 100;
-input bool InpCloseSignal = false;
-
-input group "==== Donchain channel ====";
-input int InpPeroid = 21;
-input int InpOffset = 0;
-input color InpColor = clrBlue;
+static input long InpMagicNumber = 241131;
+static input double InpLots = 0.01;
+input int InpBars = 20;
+input int InpIndexFilter = 0;
 input int InpSizeFilter = 0;
+input int InpStopLoss = 0;
+input bool InpTrailingSl = true;
+input int InpTakeProfit = 0;
 
-int handle;
-double bufferUpper[];
-double bufferLower[];
-MqlTick currentTick;
-CTrade trade;
-datetime openTimeBuy = 0;
-datetime openTimeSell = 0;
+double high = 0;
+
 
 int OnInit() {
   if (InpMagicNumber <= 0) {
@@ -84,7 +70,6 @@ int OnInit() {
 
   return (INIT_SUCCEEDED);
 }
-
 void OnDeinit(const int reason) {
 
   if (handle != INVALID_HANDLE) {
@@ -99,93 +84,92 @@ void OnTick() {
   if (!IsNewBar()) {
     return;
   }
-
-  if (!SymbolInfoTick(_Symbol, currentTick)) {
+  
+  if(!SymbolInfoTick(_Symbol, currentTick)) {
     Print("Failed to get current tick");
     return;
   }
 
   int values = CopyBuffer(handle, 0, 0, 1, bufferUpper) + CopyBuffer(handle, 1, 0, 1, bufferLower);
-  if (values != 2) {
+  if (values!=2) {
     Print("Failed to get indicator values");
     return;
   }
-
-  Comment("bufferUpper[0]: ", bufferUpper[0],
-    "bufferLower[0]:", bufferLower[0]);
-
+  
+  Comment("bufferUpper[0]: ", bufferUpper[0], 
+         "bufferLower[0]:", bufferLower[0]);
+         
   int cntBuy, cntSell;
   if (!CountOpenPositions(cntBuy, cntSell)) {
     return;
   }
-
-  if (InpSizeFilter > 0 && (bufferUpper[0] - bufferLower[0]) < InpSizeFilter * _Point) {
+  
+  if (InpSizeFilter > 0 && (bufferUpper[0] - bufferLower[0])<InpSizeFilter * _Point) {
     Print("Filtered out by size filter");
     return;
   }
-
-  if (cntBuy == 0 && currentTick.ask <= bufferLower[0] && openTimeBuy != iTime(_Symbol, PERIOD_CURRENT, 0)) {
-    openTimeBuy = iTime(_Symbol, PERIOD_CURRENT, 0);
+  
+  if (cntBuy == 0 && currentTick.ask <= bufferLower[0] && openTimeBuy!=iTime(_Symbol, PERIOD_CURRENT,0)) {
+    openTimeBuy = iTime(_Symbol, PERIOD_CURRENT,0);
     if (InpCloseSignal) {
       if (!ClosePositions(2)) {
         return;
       }
     }
-
+    
     double sl = 0;
     double tp = 0;
-
-    if (InpSLTPMode == SL_TP_MODE_PCT) {
-      sl = InpStopLoss == 0 ? 0 : currentTick.bid - (bufferUpper[0] - bufferLower[0]) * InpStopLoss * 0.01;
-      tp = InpTakeProfit == 0 ? 0 : currentTick.bid + (bufferUpper[0] - bufferLower[0]) * InpTakeProfit * 0.01;
+    
+    if(InpSLTPMode==SL_TP_MODE_PCT) {
+      sl = InpStopLoss ==0 ? 0 : currentTick.bid - (bufferUpper[0]-bufferLower[0]) * InpStopLoss * 0.01;
+      tp = InpTakeProfit ==0 ? 0 : currentTick.bid + (bufferUpper[0]-bufferLower[0]) * InpTakeProfit * 0.01;
     }
-    if (InpSLTPMode == SL_TP_MODE_POINTS) {
-      sl = InpStopLoss == 0 ? 0 : currentTick.bid - InpStopLoss * _Point;
-      tp = InpTakeProfit == 0 ? 0 : currentTick.bid + InpTakeProfit * _Point;
+    if(InpSLTPMode==SL_TP_MODE_POINTS) { 
+      sl = InpStopLoss ==0 ? 0 : currentTick.bid - InpStopLoss * _Point;
+      tp = InpTakeProfit ==0 ? 0 : currentTick.bid + InpTakeProfit * _Point;
     }
-
+    
     if (!NormalizePrice(sl)) {
       return;
     }
     if (!NormalizePrice(tp)) {
       return;
     }
-    trade.PositionOpen(_Symbol, ORDER_TYPE_BUY, InpLotSize, currentTick.ask, sl, tp, "Donchain trade");
+    trade.PositionOpen(_Symbol,ORDER_TYPE_BUY,InpLotSize,currentTick.ask,sl,tp,"Donchain trade");
   }
-
-  if (cntSell == 0 && currentTick.bid >= bufferUpper[0] && openTimeBuy != iTime(_Symbol, PERIOD_CURRENT, 0)) {
-    openTimeSell = iTime(_Symbol, PERIOD_CURRENT, 0);
+  
+  if (cntSell == 0 && currentTick.bid >= bufferUpper[0] && openTimeBuy!=iTime(_Symbol, PERIOD_CURRENT,0)) {
+    openTimeSell = iTime(_Symbol, PERIOD_CURRENT,0);
     if (InpCloseSignal) {
       if (!ClosePositions(1)) {
         return;
       }
     }
-
+    
     double sl = 0;
     double tp = 0;
-
-    if (InpSLTPMode == SL_TP_MODE_PCT) {
-      sl = InpStopLoss == 0 ? 0 : currentTick.ask + (bufferUpper[0] - bufferLower[0]) * InpStopLoss * 0.01;
-      tp = InpTakeProfit == 0 ? 0 : currentTick.ask - (bufferUpper[0] - bufferLower[0]) * InpTakeProfit * 0.01;
+    
+    if(InpSLTPMode==SL_TP_MODE_PCT) {
+      sl = InpStopLoss ==0 ? 0 : currentTick.ask + (bufferUpper[0]-bufferLower[0]) * InpStopLoss * 0.01;
+      tp = InpTakeProfit ==0 ? 0 : currentTick.ask - (bufferUpper[0]-bufferLower[0]) * InpTakeProfit * 0.01;
     }
-    if (InpSLTPMode == SL_TP_MODE_POINTS) {
-      sl = InpStopLoss == 0 ? 0 : currentTick.ask + InpStopLoss * _Point;
-      tp = InpTakeProfit == 0 ? 0 : currentTick.ask - InpTakeProfit * _Point;
+    if(InpSLTPMode==SL_TP_MODE_POINTS) { 
+      sl = InpStopLoss ==0 ? 0 : currentTick.ask + InpStopLoss * _Point;
+      tp = InpTakeProfit ==0 ? 0 : currentTick.ask - InpTakeProfit * _Point;
     }
-
+    
     if (!NormalizePrice(sl)) {
       return;
     }
     if (!NormalizePrice(tp)) {
       return;
     }
-    trade.PositionOpen(_Symbol, ORDER_TYPE_SELL, InpLotSize, currentTick.bid, sl, tp, "Donchain trade");
+    trade.PositionOpen(_Symbol,ORDER_TYPE_SELL,InpLotSize,currentTick.bid,sl,tp,"Donchain trade");
   }
 
 }
 
 bool IsNewBar() {
-
   static datetime previousTime = 0;
   datetime currentTime = iTime(_Symbol, PERIOD_CURRENT, 0);
   if (previousTime != currentTime) {
@@ -195,8 +179,7 @@ bool IsNewBar() {
   return false;
 }
 
-bool CountOpenPositions(int & countBuy, int & countSell) {
-
+bool CountOpenPositions(int &countBuy, int &countSell) {
   countBuy = 0;
   countSell = 0;
   int total = PositionsTotal();
@@ -232,8 +215,7 @@ bool CountOpenPositions(int & countBuy, int & countSell) {
   return true;
 }
 
-bool NormalizePrice(double & normalizedPrice) {
-
+bool NormalizePrice(double &normalizedPrice) {
   double tickSize = 0;
   if (!SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE, tickSize)) {
     Print("Failed to get tick size");
@@ -245,7 +227,6 @@ bool NormalizePrice(double & normalizedPrice) {
 }
 
 bool ClosePositions(int all_buy_sell) {
-
   int total = PositionsTotal();
   for (int i = total - 1; i >= 0; i--) {
     ulong positionTicket = PositionGetTicket(i);
