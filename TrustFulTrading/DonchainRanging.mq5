@@ -200,7 +200,7 @@ bool IsNewBar() {
 }
 
 
-bool CountOpenPositions(int & countBuy, int & countSell) {
+bool CountOpenPositions(int &countBuy, int &countSell) {
 
   countBuy = 0;
   countSell = 0;
@@ -238,7 +238,7 @@ bool CountOpenPositions(int & countBuy, int & countSell) {
 }
 
 
-bool NormalizePrice(double & normalizedPrice) {
+bool NormalizePrice(double &normalizedPrice) {
 
   double tickSize = 0;
   if (!SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE, tickSize)) {
