@@ -181,13 +181,13 @@ void DrawObjects() {
   ObjectDelete(NULL, "high");
   ObjectCreate(NULL, "high", OBJ_TREND, 0, time1, high, time2, high);
   ObjectSetInteger(NULL, "high", OBJPROP_WIDTH, 3);
-  ObjectSetInteger(NULL, "high", OBJPROP_COLOR, CheckIndexFilter(highIdx) && CheckSizeFilter() ? clrLime : clrBlack);
+  ObjectSetInteger(NULL, "high", OBJPROP_COLOR, CheckIndexFilter(highIdx) && CheckSizeFilter() ? clrGreen : clrBlack);
 
   //low
   ObjectDelete(NULL, "low");
   ObjectCreate(NULL, "low", OBJ_TREND, 0, time1, low, time2, low);
   ObjectSetInteger(NULL, "low", OBJPROP_WIDTH, 3);
-  ObjectSetInteger(NULL, "low", OBJPROP_COLOR, CheckIndexFilter(lowIdx) && CheckSizeFilter() ? clrLime : clrBlack);
+  ObjectSetInteger(NULL, "low", OBJPROP_COLOR, CheckIndexFilter(lowIdx) && CheckSizeFilter() ? clrGreen : clrBlack);
 
   //index filter
   ObjectDelete(NULL, "indexFilter");
@@ -205,7 +205,7 @@ void DrawObjects() {
   ObjectDelete(NULL, "text");
   ObjectCreate(NULL, "text", OBJ_TEXT, 0, time2, low);
   ObjectSetInteger(NULL, "text", OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
-  ObjectSetInteger(NULL, "text", OBJPROP_COLOR, clrBlue);
+  ObjectSetInteger(NULL, "text", OBJPROP_COLOR, clrBlack);
   ObjectSetString(NULL, "text", OBJPROP_TEXT, "Bars: " + (string) InpBars +
     " index filter: " + DoubleToString(round(InpBars * InpIndexFilter * 0.01), 0) +
     " high index: " + (string) highIdx +
