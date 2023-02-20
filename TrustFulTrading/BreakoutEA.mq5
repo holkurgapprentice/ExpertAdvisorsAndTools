@@ -69,7 +69,9 @@ RANGE_STRUCT range;
 MqlTick prevTick, lastTick;
 CTrade trade;
 
+
 int OnInit() {
+
   if (!CheckInputs()) {
     return INIT_PARAMETERS_INCORRECT;
   }
@@ -85,12 +87,15 @@ int OnInit() {
   return (INIT_SUCCEEDED);
 }
 
+
 void OnDeinit(const int reason) {
+
   ObjectDelete(NULL, "range");
 }
 
+
 void OnTick() {
-  // get current tick
+
   prevTick = lastTick;
   SymbolInfoTick(_Symbol, lastTick);
 
@@ -132,7 +137,9 @@ void OnTick() {
   CheckBreakouts();
 }
 
+
 bool CheckInputs() {
+
   if (InpMagicNumber <= 0) {
     Alert("Magic number below 0");
     return false;
@@ -173,6 +180,7 @@ bool CheckInputs() {
 }
 
 void CalculateRange() {
+
   range.start_time = 0;
   range.end_time = 0;
   range.close_time = 0;
@@ -227,8 +235,9 @@ void CalculateRange() {
   DrawObjects();
 }
 
-// count all own positions
+
 int CountOpenPositons() {
+
   int counter = 0;
   int total = PositionsTotal();
   for (int i = total - 1; i >= 0; i--) {
@@ -254,39 +263,36 @@ int CountOpenPositons() {
   return counter;
 }
 
-// check for breakouts
+
 void CheckBreakouts() {
+
   if (lastTick.time >= range.end_time && range.end_time > 0 && range.f_entry) {
     if (!range.f_high_breakout && lastTick.ask >= range.high) {
       range.f_high_breakout = true;
       if (InpBreakoutMode == ONE_SIGNAL) {
         range.f_low_breakout = true;
       }
-      
+
       double sl;
       // calc sl tp
-      if (InpStopLossMode == VALUE) 
-      {
-         sl = InpStopLoss == 0 ? 0 : NormalizeDouble(
+      if (InpStopLossMode == VALUE) {
+        sl = InpStopLoss == 0 ? 0 : NormalizeDouble(
           lastTick.bid - ((range.high - range.low) *
             InpStopLoss * 0.01),
           _Digits);
       }
-      if (InpStopLossMode == HALF_CHANNEL) 
-      {
-         sl = NormalizeDouble(
+      if (InpStopLossMode == HALF_CHANNEL) {
+        sl = NormalizeDouble(
           ((range.high - range.low) / 2) + range.low,
           _Digits);
       }
-      
-      if (InpStopLossMode == NEGATIVE_END_CHANNEL) 
-      {
-         sl = NormalizeDouble(
+
+      if (InpStopLossMode == NEGATIVE_END_CHANNEL) {
+        sl = NormalizeDouble(
           range.low,
           _Digits);
       }
-   
-   
+
       double tp =
         InpTakeProfit == 0 ?
         0 :
@@ -313,27 +319,24 @@ void CheckBreakouts() {
 
       // calc sl tp
       double sl;
-      if (InpStopLossMode == VALUE) 
-      {
-         sl = InpStopLoss == 0 ? 0 : NormalizeDouble(
+      if (InpStopLossMode == VALUE) {
+        sl = InpStopLoss == 0 ? 0 : NormalizeDouble(
           lastTick.ask + ((range.high - range.low) *
             InpStopLoss * 0.01),
           _Digits);
       }
-      if (InpStopLossMode == HALF_CHANNEL) 
-      {
-         sl = NormalizeDouble(
+      if (InpStopLossMode == HALF_CHANNEL) {
+        sl = NormalizeDouble(
           range.high - (range.high - range.low),
           _Digits);
       }
-      
-      if (InpStopLossMode == NEGATIVE_END_CHANNEL) 
-      {
-         sl = NormalizeDouble(
+
+      if (InpStopLossMode == NEGATIVE_END_CHANNEL) {
+        sl = NormalizeDouble(
           range.high,
           _Digits);
       }
-      
+
       double tp =
         InpTakeProfit == 0 ?
         0 :
@@ -354,8 +357,9 @@ void CheckBreakouts() {
   }
 }
 
-// close positions
+
 bool ClosePositions() {
+
   int total = PositionsTotal();
   for (int i = total - 1; i >= 0; i--) {
     if (total != PositionsTotal()) {
@@ -390,7 +394,9 @@ bool ClosePositions() {
   return true;
 }
 
+
 void DrawObjects() {
+
   // start time
   ObjectDelete(NULL, "range start");
   if (range.start_time > 0) {
@@ -472,35 +478,36 @@ void DrawObjects() {
   }
 }
 
-// calc lots
+
 bool CalculateLots(double slDistance, double &lots) {
+
   lots = 0.0;
   if (InpLotMode == LOT_MODE_FIXED) {
     lots = InpLots;
-  } 
+  }
   if (InpLotMode == LOT_MODE_MONEY || InpLotMode == LOT_MODE_PCT_ACCOUNT) {
     double tickSize = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
     double tickValue = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE);
     double volumeStep = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_STEP);
 
     double riskMoney;
-    
+
     if (InpLotMode == LOT_MODE_MONEY) {
       riskMoney = InpLots; // should contain money value ex: 50 in usd 
     }
-    
+
     if (InpLotMode == LOT_MODE_PCT_ACCOUNT) {
       riskMoney = AccountInfoDouble(ACCOUNT_EQUITY) * InpLots * 0.01; // should contain percent ex 14 value for 14 % of account
     }
-    
+
     if (tickSize == 0) {
       Print("tickSize equal 0");
       tickSize = 1;
     }
-    
+
     double moneyVolumeStep = (slDistance / tickSize) * tickValue * volumeStep;
-    
-    if (moneyVolumeStep == 0) { 
+
+    if (moneyVolumeStep == 0) {
       Print("ERR: moneyVolumeStep equal 0");
       return false;
     }
@@ -515,7 +522,9 @@ bool CalculateLots(double slDistance, double &lots) {
   return true;
 }
 
+
 bool CheckLots(double &lots) {
+
   double min = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
   double max = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MAX);
   double step = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_STEP);
@@ -538,10 +547,10 @@ bool CheckLots(double &lots) {
     Print("lotst above max");
     return false;
   }
-  
+
   if (step == 0) {
     Print("step equal 0");
-    step = 1;  
+    step = 1;
   }
 
   lots = (int) MathFloor(lots / step) * step;
