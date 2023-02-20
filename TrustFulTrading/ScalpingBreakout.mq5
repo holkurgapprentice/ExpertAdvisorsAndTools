@@ -32,6 +32,42 @@ CTrade trade;
 int OnInit() {
 
   if (!CheckInputs()) {
+  
+    if (InpMagicNumber<=0) {
+      Print("Wrong input magic number");
+      return false;
+    }
+    
+    if (InpLots<=0) {
+      Print("Wrong input lot size <= 0");
+      return false;
+    }
+    
+    if (InpBars<=0) {
+      Print("Wrong input InpBars<=0");
+      return false;
+    }
+    
+    if (InpIndexFilter<0 || InpIndexFilter >= 50) {
+      Print("Wrong input InpIndexFilter<0 || InpIndexFilter >= 50");
+      return false;
+    }
+    
+    if (InpSizeFilter<0) {
+      Print("Wrong input InpSizeFilter<0");
+      return false;
+    }
+    
+    if (InpStopLoss<0) {
+      Print("Wrong input InpStopLoss<0");
+      return false;
+    }
+    
+    if (InpTakeProfit<0) {
+      Print("Wrong input InpTakeProfit<0");
+      return false;
+    }
+  
     return INIT_PARAMETERS_INCORRECT;
   }
 

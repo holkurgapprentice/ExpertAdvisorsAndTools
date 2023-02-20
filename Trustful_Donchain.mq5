@@ -52,7 +52,9 @@ int OnCalculate(
   return (rates_total);
 }
 
+
 void InitializeBuffer(int index, double &buffer[], string label) {
+
   SetIndexBuffer(index, buffer, INDICATOR_DATA);
   PlotIndexSetInteger(index, PLOT_DRAW_TYPE, DRAW_LINE);
   PlotIndexSetInteger(index, PLOT_LINE_WIDTH, 2);
