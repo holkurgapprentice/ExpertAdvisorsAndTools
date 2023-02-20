@@ -20,6 +20,7 @@ input int InpStopLoss = 0;
 input bool InpTrailingSl = true;
 input int InpTakeProfit = 0;
 
+
 double high = 0;
 double low = 0;
 int highIdx = 0;
@@ -27,7 +28,9 @@ int lowIdx = 0;
 MqlTick currentTick, previousTick;
 CTrade trade;
 
+
 int OnInit() {
+
   if (!CheckInputs()) {
     return INIT_PARAMETERS_INCORRECT;
   }
@@ -37,6 +40,7 @@ int OnInit() {
   return (INIT_SUCCEEDED);
 }
 
+
 void OnDeinit(const int reason) {
 
   ObjectDelete(NULL, "high");
@@ -44,6 +48,7 @@ void OnDeinit(const int reason) {
   ObjectDelete(NULL, "text");
   ObjectDelete(NULL, "indexFilter");
 }
+
 
 void OnTick() {
 
@@ -106,10 +111,12 @@ void OnTick() {
   DrawObjects();
 }
 
+
 bool CheckInputs() {
 
   return true;
 }
+
 
 bool CheckIndexFilter(int index) {
 
@@ -119,6 +126,7 @@ bool CheckIndexFilter(int index) {
   return true;
 }
 
+
 bool CheckSizeFilter() {
 
   if (InpSizeFilter > 0 && (high - low) > InpSizeFilter * _Point) {
@@ -126,6 +134,7 @@ bool CheckSizeFilter() {
   }
   return true;
 }
+
 
 void DrawObjects() {
 
@@ -168,9 +177,80 @@ void DrawObjects() {
     " size: " + DoubleToString((high - low) / _Point, 0));
 }
 
+
 void UpdateStopLoss(double slDistance) {
 
+  int total = PositionsTotal();
+  for (int i = total - 1; i >= 0; i--) {
+    ulong ticket = PositionGetTicket(i);
+
+    if (ticket <= 0) {
+      Print("Failed to get ticket");
+      return;
+    }
+
+    if (!PositionSelectByTicket(ticket)) {
+      Print("Failed to PositionSelectByTicket");
+      return;
+    }
+
+    long magic;
+
+    if (!PositionGetInteger(POSITION_MAGIC, magic)) {
+      Print("Failed to get magic");
+      return;
+    }
+
+    if (magic == InpMagicNumber) {
+      long type;
+      if (!PositionGetInteger(POSITION_TYPE, type)) {
+        Print("Failed to get type");
+        return;
+      }
+
+      double currSl, currTP;
+
+      if (!PositionGetDouble(POSITION_SL, currSL)) {
+        Print("Failed to get current SL");
+        return;
+      }
+
+      if (!PositionGetDouble(POSITION_TP, currTP)) {
+        Print("Failed to get current TP");
+        return;
+      }
+
+      double currPrice = type == POSITION_TYPE_BUY ? currentTick.bid : currentTick.ask;
+      int n = type == POSITION_TYPE_BUY ? 1 : -1;
+      double newSL = currPrice - slDistance * n;
+
+      if (!NormalizePrice(newSL)) {
+        Print("Failed to normalize price");
+        return;
+      }
+
+      if ((newSL * n) < (currSL * n) || NormalizeDouble(MathAbs(newSL - currSL), _Digits) < _Point) {
+        continue;
+      }
+
+      long level = SymbolInfoInteger(_Symbol, SYMBOL_TRADE_STOPS_LEVEL);
+
+      if (level != 0 && MathAbs(currPrice - newSL) < level * _Point) {
+        Print("New SL lower than minimal stop level");
+        return;
+      }
+
+      if (!trade.PositionModify(ticket, newSl, currTP)) {
+        Print("Failed to set new SL for position:" + (string) ticket +
+          " currSL: " + (string) currSL + " newSL: " + (string) newSL +
+          " currTP: " + (string) currTP);
+        return;
+      }
+
+    }
+  }
 }
+
 
 bool IsNewBar() {
 
@@ -183,7 +263,8 @@ bool IsNewBar() {
   return false;
 }
 
-bool CountOpenPositions(int & countBuy, int & countSell) {
+
+bool CountOpenPositions(int &countBuy, int &countSell) {
 
   countBuy = 0;
   countSell = 0;
@@ -220,7 +301,9 @@ bool CountOpenPositions(int & countBuy, int & countSell) {
   return true;
 }
 
-bool NormalizePrice(double & normalizedPrice) {
+
+bool NormalizePrice(double &normalizedPrice) {
+
   double tickSize = 0;
   if (!SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE, tickSize)) {
     Print("Failed to get tick size");
@@ -231,7 +314,9 @@ bool NormalizePrice(double & normalizedPrice) {
   return true;
 }
 
+
 bool ClosePositions(int all_buy_sell) {
+
   int total = PositionsTotal();
   for (int i = total - 1; i >= 0; i--) {
     ulong positionTicket = PositionGetTicket(i);
