@@ -1,5 +1,5 @@
 //+------------------------------------------------------------------+
-//|                                              DonchainRanging.mq5 |
+//|                                             ScalpingBreakout.mq5 |
 //|                                  Copyright 2022, MetaQuotes Ltd. |
 //|                                             https://www.mql5.com |
 //+------------------------------------------------------------------+
@@ -169,7 +169,7 @@ void DrawObjects() {
   ObjectDelete(NULL, "text");
   ObjectCreate(NULL, "text", OBJ_TEXT, 0, time2, low);
   ObjectSetInteger(NULL, "text", OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
-  ObjectSetInteger(NULL, "text", OBJPROP_COLOR, clrBlack);
+  ObjectSetInteger(NULL, "text", OBJPROP_COLOR, clrBlue);
   ObjectSetString(NULL, "text", OBJPROP_TEXT, "Bars: " + (string) InpBars +
     " index filter: " + DoubleToString(round(InpBars * InpIndexFilter * 0.01), 0) +
     " high index: " + (string) highIdx +
@@ -208,7 +208,7 @@ void UpdateStopLoss(double slDistance) {
         return;
       }
 
-      double currSl, currTP;
+      double currSL, currTP;
 
       if (!PositionGetDouble(POSITION_SL, currSL)) {
         Print("Failed to get current SL");
@@ -240,7 +240,7 @@ void UpdateStopLoss(double slDistance) {
         return;
       }
 
-      if (!trade.PositionModify(ticket, newSl, currTP)) {
+      if (!trade.PositionModify(ticket, newSL, currTP)) {
         Print("Failed to set new SL for position:" + (string) ticket +
           " currSL: " + (string) currSL + " newSL: " + (string) newSL +
           " currTP: " + (string) currTP);

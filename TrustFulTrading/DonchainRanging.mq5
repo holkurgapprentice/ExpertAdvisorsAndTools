@@ -38,6 +38,7 @@ datetime openTimeBuy = 0;
 datetime openTimeSell = 0;
 
 int OnInit() {
+
   if (InpMagicNumber <= 0) {
     Alert("InpMagicNumber <= 0");
     return INIT_PARAMETERS_INCORRECT;
@@ -85,6 +86,7 @@ int OnInit() {
   return (INIT_SUCCEEDED);
 }
 
+
 void OnDeinit(const int reason) {
 
   if (handle != INVALID_HANDLE) {
@@ -93,6 +95,7 @@ void OnDeinit(const int reason) {
   }
 
 }
+
 
 void OnTick() {
 
@@ -184,6 +187,7 @@ void OnTick() {
 
 }
 
+
 bool IsNewBar() {
 
   static datetime previousTime = 0;
@@ -194,6 +198,7 @@ bool IsNewBar() {
   }
   return false;
 }
+
 
 bool CountOpenPositions(int & countBuy, int & countSell) {
 
@@ -232,6 +237,7 @@ bool CountOpenPositions(int & countBuy, int & countSell) {
   return true;
 }
 
+
 bool NormalizePrice(double & normalizedPrice) {
 
   double tickSize = 0;
@@ -243,6 +249,7 @@ bool NormalizePrice(double & normalizedPrice) {
 
   return true;
 }
+
 
 bool ClosePositions(int all_buy_sell) {
 
