@@ -218,7 +218,7 @@ void CalculateRange() {
       range.start_time -= time_cycle;
     }
     
-    //rewind start date to first trading in past
+    //rewind date to first trading in past
     MoveDate(-1, range.start_time);
     
     calcSpan = true;
@@ -226,6 +226,7 @@ void CalculateRange() {
 
   // calculate range end time
   range.end_time = range.start_time + InpRangeDuration * 60;
+  //rewind date to first trading in future
   MoveDate(1, range.end_time);
     
   // calculate range close
@@ -237,31 +238,20 @@ void CalculateRange() {
     MoveDate(1, range.close_time);
   }
 
-
   if (calcSpan) {
-    //MqlDateTime startTime, endTime;
-    //TimeToStruct(range.start_time, startTime);
-    //TimeToStruct(range.end_time, endTime);
-    
-    //if (calcSpan && endTime.day != startTime.day) {
-      //range.start_time -= time_cycle;
-      //range.close_time -= time_cycle;
-      //range.end_time -= time_cycle;
-      
-      int indexRangeStart = iBarShift(_Symbol, PERIOD_CURRENT, range.start_time, false);
-      int indexRangeEnd;
-      if (range.end_time >= lastTick.time) {
-        indexRangeEnd = 0;
-      } else {
-        indexRangeEnd = iBarShift(_Symbol, PERIOD_CURRENT, range.end_time, false);
-      }
-      
-      int indexHighestBar = iHighest(_Symbol,PERIOD_CURRENT, MODE_HIGH, indexRangeStart-indexRangeEnd, indexRangeEnd);
-      int indexLowestBar = iLowest(_Symbol,PERIOD_CURRENT, MODE_LOW, indexRangeStart-indexRangeEnd, indexRangeEnd);
-      
-      range.high = iHigh(_Symbol, PERIOD_CURRENT, indexHighestBar);
-      range.low = iLow(_Symbol, PERIOD_CURRENT, indexLowestBar);
-    //}
+    int indexRangeStart = iBarShift(_Symbol, PERIOD_CURRENT, range.start_time, false);
+    int indexRangeEnd;
+    if (range.end_time >= lastTick.time) {
+      indexRangeEnd = 0;
+    } else {
+      indexRangeEnd = iBarShift(_Symbol, PERIOD_CURRENT, range.end_time, false);
+    }
+   
+    int indexHighestBar = iHighest(_Symbol,PERIOD_CURRENT, MODE_HIGH, indexRangeStart-indexRangeEnd, indexRangeEnd);
+    int indexLowestBar = iLowest(_Symbol,PERIOD_CURRENT, MODE_LOW, indexRangeStart-indexRangeEnd, indexRangeEnd);
+   
+    range.high = iHigh(_Symbol, PERIOD_CURRENT, indexHighestBar);
+    range.low = iLow(_Symbol, PERIOD_CURRENT, indexLowestBar);
     
     calcSpan = false;
   }
