@@ -32,6 +32,7 @@ input group "===Range inputs==="
 input int InpRangeStart = 600; // Time for open range in minutes from 0:00 (600 min = 10:00)
 input int InpRangeDuration = 120; // Time for range in minutes
 input int InpRangeClose = 1200; // Time for close positions in minutes from 0:00 (1200 min = 20:00)
+input bool InpHandleLongTimeSpans = false; // If timespan start on the end of a day, there is no need to wait for upcoming day
 
 enum BREAKOUT_MODE_ENUM {
   ONE_SIGNAL,
@@ -45,6 +46,7 @@ input bool InpTuesday = true;
 input bool InpWednesday = true;
 input bool InpThursday = true;
 input bool InpFriday = true;
+
 
 struct RANGE_STRUCT {
   datetime start_time;
@@ -68,6 +70,8 @@ struct RANGE_STRUCT {
 RANGE_STRUCT range;
 MqlTick prevTick, lastTick;
 CTrade trade;
+bool calcSpan = false;
+int time_cycle = 86400; // whole day in minutes
 
 
 int OnInit() {
@@ -191,7 +195,6 @@ void CalculateRange() {
   range.f_low_breakout = false;
 
   // calc range start
-  int time_cycle = 86400;
   range.start_time =
     (lastTick.time - (lastTick.time % time_cycle)) + InpRangeStart * 60;
   for (int i = 0; i < 8; i++) {
@@ -205,36 +208,84 @@ void CalculateRange() {
       range.start_time += time_cycle;
     }
   }
+  
+  if (InpHandleLongTimeSpans && lastTick.time <= range.start_time) {
+    MqlDateTime startTime, endTime;
+    TimeToStruct(range.start_time, startTime);
+    TimeToStruct(range.end_time, endTime);
+    
+    if (lastTick.time <= range.start_time && endTime.day != startTime.day) {
+      range.start_time -= time_cycle;
+    }
+    
+    //rewind start date to first trading in past
+    MoveDate(-1, range.start_time);
+    
+    calcSpan = true;
+  }
 
   // calculate range end time
   range.end_time = range.start_time + InpRangeDuration * 60;
-  for (int i = 0; i < 2; i++) {
-    MqlDateTime tmp;
-    TimeToStruct(range.end_time, tmp);
-    int dow = tmp.day_of_week;
-    if (dow == 6 || dow == 0) {
-      range.end_time += time_cycle;
-    }
-  }
-
+  MoveDate(1, range.end_time);
+    
   // calculate range close
   if (InpRangeClose >= 0) {
-    range.close_time =
-      (range.end_time - (range.end_time % time_cycle)) + InpRangeClose * 60;
-    for (int i = 0; i < 3; i++) {
-      MqlDateTime tmp;
-      TimeToStruct(range.close_time, tmp);
-      int dow = tmp.day_of_week;
-      if (range.close_time <= range.end_time || dow == 6 || dow == 0) {
-        range.close_time += time_cycle;
-      }
+    range.close_time = (range.end_time - (range.end_time % time_cycle)) + InpRangeClose * 60;
+    if (range.close_time <= range.end_time) {
+      range.close_time += time_cycle;
     }
+    MoveDate(1, range.close_time);
+  }
+
+
+  if (calcSpan) {
+    //MqlDateTime startTime, endTime;
+    //TimeToStruct(range.start_time, startTime);
+    //TimeToStruct(range.end_time, endTime);
+    
+    //if (calcSpan && endTime.day != startTime.day) {
+      //range.start_time -= time_cycle;
+      //range.close_time -= time_cycle;
+      //range.end_time -= time_cycle;
+      
+      int indexRangeStart = iBarShift(_Symbol, PERIOD_CURRENT, range.start_time, false);
+      int indexRangeEnd;
+      if (range.end_time >= lastTick.time) {
+        indexRangeEnd = 0;
+      } else {
+        indexRangeEnd = iBarShift(_Symbol, PERIOD_CURRENT, range.end_time, false);
+      }
+      
+      int indexHighestBar = iHighest(_Symbol,PERIOD_CURRENT, MODE_HIGH, indexRangeStart-indexRangeEnd, indexRangeEnd);
+      int indexLowestBar = iLowest(_Symbol,PERIOD_CURRENT, MODE_LOW, indexRangeStart-indexRangeEnd, indexRangeEnd);
+      
+      range.high = iHigh(_Symbol, PERIOD_CURRENT, indexHighestBar);
+      range.low = iLow(_Symbol, PERIOD_CURRENT, indexLowestBar);
+    //}
+    
+    calcSpan = false;
   }
 
   // draw objects
   DrawObjects();
 }
 
+
+void MoveDate(int direction, datetime &date) {
+  MqlDateTime currentTime;
+  TimeToStruct(date, currentTime);
+  if (currentTime.day_of_week == 0 || currentTime.day_of_week == 6) {
+    while(currentTime.day_of_week != 5 && currentTime.day_of_week != 1) {
+      if (direction == 1) {
+        date += time_cycle;
+      }
+      if (direction == -1) {
+        date -= time_cycle;
+      }
+      TimeToStruct(date, currentTime);
+    }
+  }
+}
 
 int CountOpenPositons() {
 
