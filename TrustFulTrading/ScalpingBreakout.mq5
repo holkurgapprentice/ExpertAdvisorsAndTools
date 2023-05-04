@@ -12,10 +12,10 @@
 
 input group "==== General ====";
 static input long InpMagicNumber = 241131;
-static input double InpLots = 0.01;
+input double InpLots = 0.01;
 input int InpBars = 20;
-input int InpIndexFilter = 0;
-input int InpSizeFilter = 0;
+input int InpIndexFilter = 0; // Index filer percents from 0 to 50
+input int InpSizeFilter = 0; // Size filter in points 0 to resonable point value
 input int InpStopLoss = 0;
 input bool InpTrailingSl = true;
 input int InpTakeProfit = 0;

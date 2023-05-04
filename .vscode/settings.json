@@ -1,0 +1,8 @@
+{
+    "C_Cpp.default.includePath": [
+        "c:\\Users\\kudlaty\\AppData\\Roaming\\MetaQuotes\\Terminal\\A748EB4A2229697856F513397ADDB2AB\\MQL5\\Include"
+    ],
+    "files.associations": {
+        "*.mq5": "cpp"
+    }
+}
