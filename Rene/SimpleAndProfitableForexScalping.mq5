@@ -12,9 +12,9 @@
 int handleTrendMaFast;
 int handleTrendMaSlow;
 
-int handleMaFast;
-int handleMaMiddle;
-int handleMaSlow;
+int maFastHandle;
+int maMiddleHandle;
+int maSlowHandle;
 
 CTrade trade;
 
@@ -32,9 +32,9 @@ int OnInit() {
    handleTrendMaFast = iMA(_Symbol, PERIOD_H1, 8, 0, MODE_EMA, PRICE_CLOSE);
    handleTrendMaSlow = iMA(_Symbol, PERIOD_H1, 21, 0, MODE_EMA, PRICE_CLOSE);
 
-   handleMaFast = iMA(_Symbol, PERIOD_M5, 8, 0, MODE_EMA, PRICE_CLOSE);
-   handleMaMiddle = iMA(_Symbol, PERIOD_M5, 13, 0, MODE_EMA, PRICE_CLOSE);
-   handleMaSlow = iMA(_Symbol, PERIOD_M5, 21, 0, MODE_EMA, PRICE_CLOSE);
+   maFastHandle = iMA(_Symbol, PERIOD_M5, 8, 0, MODE_EMA, PRICE_CLOSE);
+   maMiddleHandle = iMA(_Symbol, PERIOD_M5, 13, 0, MODE_EMA, PRICE_CLOSE);
+   maSlowHandle = iMA(_Symbol, PERIOD_M5, 21, 0, MODE_EMA, PRICE_CLOSE);
    return (INIT_SUCCEEDED);
 }
 //+------------------------------------------------------------------+
@@ -58,9 +58,9 @@ void OnTick() {
    CopyBuffer(handleTrendMaSlow, 0, 0, 1, maTrendSlow);
 
    double maFast[], maMiddle[], maSlow[];
-   CopyBuffer(handleMaFast, 0, 0, 1, maFast);
-   CopyBuffer(handleMaMiddle, 0, 0, 1, maMiddle);
-   CopyBuffer(handleMaSlow, 0, 0, 1, maSlow);
+   CopyBuffer(maFastHandle, 0, 0, 1, maFast);
+   CopyBuffer(maMiddleHandle, 0, 0, 1, maMiddle);
+   CopyBuffer(maSlowHandle, 0, 0, 1, maSlow);
 
    double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
 

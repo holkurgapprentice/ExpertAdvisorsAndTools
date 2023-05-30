@@ -13,9 +13,9 @@
 int handleTrendMaFast;
 int handleTrendMaSlow;
 
-int handleMaFast;
-int handleMaMiddle;
-int handleMaSlow;
+int maFastHandle;
+int maMiddleHandle;
+int maSlowHandle;
 
 CTrade trade;
 
@@ -54,9 +54,9 @@ int OnInit() {
    handleTrendMaFast = iMA(_Symbol, trendTimeFrame, emaTrendFast, 0, MODE_EMA, PRICE_CLOSE);
    handleTrendMaSlow = iMA(_Symbol, trendTimeFrame, emaTrendSlow, 0, MODE_EMA, PRICE_CLOSE);
 
-   handleMaFast = iMA(_Symbol, tradeTimeFrame, emaTradeFast, 0, MODE_EMA, PRICE_CLOSE);
-   handleMaMiddle = iMA(_Symbol, tradeTimeFrame, emaTradeMiddle, 0, MODE_EMA, PRICE_CLOSE);
-   handleMaSlow = iMA(_Symbol, tradeTimeFrame, emaTradeSlow, 0, MODE_EMA, PRICE_CLOSE);
+   maFastHandle = iMA(_Symbol, tradeTimeFrame, emaTradeFast, 0, MODE_EMA, PRICE_CLOSE);
+   maMiddleHandle = iMA(_Symbol, tradeTimeFrame, emaTradeMiddle, 0, MODE_EMA, PRICE_CLOSE);
+   maSlowHandle = iMA(_Symbol, tradeTimeFrame, emaTradeSlow, 0, MODE_EMA, PRICE_CLOSE);
    return (INIT_SUCCEEDED);
 }
 //+------------------------------------------------------------------+
@@ -111,9 +111,9 @@ void RenderTrendDirection() {
    CopyBuffer(handleTrendMaFast, 0, 0, 1, maTrendFast);
    CopyBuffer(handleTrendMaSlow, 0, 0, 1, maTrendSlow);
 
-   CopyBuffer(handleMaFast, 0, 1, 1, maFast); // take recent - 1 value
-   CopyBuffer(handleMaMiddle, 0, 1, 1, maMiddle);
-   CopyBuffer(handleMaSlow, 0, 1, 1, maSlow);
+   CopyBuffer(maFastHandle, 0, 1, 1, maFast); // take recent - 1 value
+   CopyBuffer(maMiddleHandle, 0, 1, 1, maMiddle);
+   CopyBuffer(maSlowHandle, 0, 1, 1, maSlow);
 
    trendDirection = 0;
    if (IsUpperTrendOnHigherTimeframe()) {

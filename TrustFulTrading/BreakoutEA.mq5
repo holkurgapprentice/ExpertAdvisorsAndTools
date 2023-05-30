@@ -12,9 +12,10 @@
 input group "===General input===" static input long InpMagicNumber = 830766;
 enum LOT_MODE_ENUM
 {
-  LOT_MODE_FIXED,
-  LOT_MODE_MONEY,
-  LOT_MODE_PCT_ACCOUNT
+  LOT_MODE_FIXED,         // Fixed lot value
+  LOT_MODE_MONEY,         // Risk exact amount of money per trade
+  LOT_MODE_PCT_ACCOUNT,   // Risk exact percentage of account balance per trade
+  LOT_MODE_PCT_EQUITY     // Risk exact part of account equity per trade
 };
 input LOT_MODE_ENUM InpLotMode = LOT_MODE_FIXED;
 input double InpLots = 0.01;
@@ -428,7 +429,7 @@ void CheckBreakouts()
       double lots;
       if (!CalculateLots(lastTick.bid - sl, lots))
       {
-        Print("❌[BreakoutEA.mq5:431]: ", "!CalculateLots(lastTick.bid - sl, lots)");
+        Print("❌[BreakoutEA.mq5:432]: ", "!CalculateLots(lastTick.bid - sl, lots)");
         return;
       }
 
@@ -436,7 +437,7 @@ void CheckBreakouts()
       if(!trade.PositionOpen(_Symbol, ORDER_TYPE_BUY, lots, lastTick.ask, sl, tp,
                          "time range ea")) 
       {
-        Print("❌[BreakoutEA.mq5:439]: ","PositionOpen Buy failed: sl ", (string)sl, " tp: ", (string)tp, " lots: ", (string)lots,
+        Print("❌[BreakoutEA.mq5:440]: ","PositionOpen Buy failed: sl ", (string)sl, " tp: ", (string)tp, " lots: ", (string)lots,
           (string)trade.ResultRetcode() + ":" +
           trade.ResultRetcodeDescription());
       }
@@ -477,7 +478,7 @@ void CheckBreakouts()
       double lots;
       if (!CalculateLots(sl - lastTick.ask, lots))
       {
-        Print("❌[BreakoutEA.mq5:480]: ", "!CalculateLots(sl - lastTick.ask, lots)");
+        Print("❌[BreakoutEA.mq5:481]: ", "!CalculateLots(sl - lastTick.ask, lots)");
         return;
       }
 
@@ -485,7 +486,7 @@ void CheckBreakouts()
       if (!trade.PositionOpen(_Symbol, ORDER_TYPE_SELL, lots, lastTick.ask, sl, tp,
                          "time range ea")) 
       {
-        Print("❌[BreakoutEA.mq5:488]: ","PositionOpen Sell failed: sl ", (string)sl, " tp: ", (string)tp, " lots: ", (string)lots,
+        Print("❌[BreakoutEA.mq5:489]: ","PositionOpen Sell failed: sl ", (string)sl, " tp: ", (string)tp, " lots: ", (string)lots,
           (string)trade.ResultRetcode() + ":" +
           trade.ResultRetcodeDescription());
       }
@@ -630,6 +631,21 @@ bool CalculateLots(double slDistance, double &lots)
   if (InpLotMode == LOT_MODE_FIXED)
   {
     lots = InpLots;
+    if (!CheckLots(lots))
+    {
+      Print("❌[BreakoutEA.mq5]: ", "!CheckLots(lots) wrong lots");
+      return false;
+    }
+  }
+  if (InpLotMode == LOT_MODE_PCT_EQUITY)
+  {
+    lots = AccountInfoDouble(ACCOUNT_EQUITY) * InpLots;
+
+    if (!CheckLots(lots))
+    {
+      Print("❌[BreakoutEA.mq5]: ", "!CheckLots(lots) wrong lots");
+      return false;
+    }
   }
   if (InpLotMode == LOT_MODE_MONEY || InpLotMode == LOT_MODE_PCT_ACCOUNT)
   {
@@ -659,7 +675,7 @@ bool CalculateLots(double slDistance, double &lots)
 
     if (moneyVolumeStep == 0)
     {
-      Print("❌[BreakoutEA.mq5:662]: ", "moneyVolumeStep equal 0 , slDistance = ", slDistance, " tickSize ", tickSize, " tickValue ", tickValue, " volumeStep ", volumeStep);
+      Print("❌[BreakoutEA.mq5]: ", "moneyVolumeStep equal 0 , slDistance = ", slDistance, " tickSize ", tickSize, " tickValue ", tickValue, " volumeStep ", volumeStep);
       return false;
     }
     Print("TEST ","moneyVolumeStep = ", moneyVolumeStep, ", slDistance = ", slDistance, " tickSize ", tickSize, " tickValue ", tickValue, " volumeStep ", volumeStep);
@@ -669,7 +685,7 @@ bool CalculateLots(double slDistance, double &lots)
 
   if (!CheckLots(lots))
   {
-    Print("❌[BreakoutEA.mq5:672]: ", "!CheckLots(lots) wrong lots");
+    Print("❌[BreakoutEA.mq5]: ", "!CheckLots(lots) wrong lots");
     return false;
   }
 
