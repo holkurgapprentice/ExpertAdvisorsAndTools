@@ -9,7 +9,8 @@
 
 #include <Trade\Trade.mqh>
 
-input group "===General input===" static input long InpMagicNumber = 830766;
+input group "===General input===";
+static input long InpMagicNumber = 830766;
 enum LOT_MODE_ENUM
 {
   LOT_MODE_FIXED,       // Fixed lot value
@@ -428,7 +429,7 @@ void CheckBreakouts()
       double lots;
       if (!CalculateLots(lastTick.bid - sl, lots))
       {
-        Print("❌[BreakoutEA.mq5:431]: ", "!CalculateLots(lastTick.bid - sl, lots)");
+        Print("❌[BreakoutEA.mq5:432]: ", "!CalculateLots(lastTick.bid - sl, lots)");
         return;
       }
 
@@ -436,7 +437,7 @@ void CheckBreakouts()
       if (!trade.PositionOpen(_Symbol, ORDER_TYPE_BUY, lots, lastTick.ask, sl, tp,
                               "time range ea"))
       {
-        Print("❌[BreakoutEA.mq5:439]: ", "PositionOpen Buy failed: sl ", (string)sl, " tp: ", (string)tp, " lots: ", (string)lots,
+        Print("❌[BreakoutEA.mq5:440]: ", "PositionOpen Buy failed: sl ", (string)sl, " tp: ", (string)tp, " lots: ", (string)lots,
               (string)trade.ResultRetcode() + ":" +
                   trade.ResultRetcodeDescription());
       }
@@ -477,15 +478,15 @@ void CheckBreakouts()
       double lots;
       if (!CalculateLots(sl - lastTick.ask, lots))
       {
-        Print("❌[BreakoutEA.mq5:480]: ", "!CalculateLots(sl - lastTick.ask, lots)");
+        Print("❌[BreakoutEA.mq5:481]: ", "!CalculateLots(sl - lastTick.ask, lots)");
         return;
       }
 
       // open sell
-      if (!trade.PositionOpen(_Symbol, ORDER_TYPE_SELL, lots, lastTick.ask, sl, tp,
+      if (!trade.PositionOpen(_Symbol, ORDER_TYPE_SELL, lots, lastTick.bid, sl, tp,
                               "time range ea"))
       {
-        Print("❌[BreakoutEA.mq5:488]: ", "PositionOpen Sell failed: sl ", (string)sl, " tp: ", (string)tp, " lots: ", (string)lots,
+        Print("❌[BreakoutEA.mq5:489]: ", "PositionOpen Sell failed: sl ", (string)sl, " tp: ", (string)tp, " lots: ", (string)lots,
               (string)trade.ResultRetcode() + ":" +
                   trade.ResultRetcodeDescription());
       }

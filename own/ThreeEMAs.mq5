@@ -54,19 +54,24 @@ bool isFilterCandleOn = false;
 
 CTrade trade;
 
+input group "====General input====";
 static input long InpMagicNumber = 700000;
 input int InpValueMaFast = 20;
 input int InpValueMaMiddle = 50;
 input int InpValueMaSlow = 100;
 input int InpSlowMargin = 100;
 input double InpLots = 0.1;
-input int InpValueRsi = 6;
-input double InpValueRsiFilterThresholdDistance = 12.5;
-input int InpMaSizeFilter = 100;
-input double InpSmallTryFactor = 1.35;
+
+input group "====Filtering setup====";
+input int InpValueRsi = 6;                              // RSI setup; step=1
+input double InpValueRsiFilterThresholdDistance = 12.5; // RSI Filter threshold; step=.5;0=off
+input int InpMaSizeFilter = 100;                        // MA channel size uppass filter; step=1;0=off
+input double InpSmallTryFactor = 1.35;                  // Small try factor; step=.05;0=wrong
+input int InpDepositLoad = 25;                          // Deposit load percentage downpass; step=1;0=off
 
 int OnInit()
 {
+    bool initResult = true;
     trade.SetExpertMagicNumber(InpMagicNumber);
 
     maFastHandle = iMA(_Symbol, PERIOD_CURRENT, InpValueMaFast, 0, MODE_EMA, PRICE_CLOSE);
@@ -74,7 +79,23 @@ int OnInit()
     maSlowHandle = iMA(_Symbol, PERIOD_CURRENT, InpValueMaSlow, 0, MODE_EMA, PRICE_CLOSE);
     rsiHandle = iRSI(_Symbol, PERIOD_CURRENT, InpValueRsi, PRICE_OPEN);
 
-    if (INVALID_HANDLE != maFastHandle && INVALID_HANDLE != maMiddleHandle && INVALID_HANDLE != maSlowHandle && INVALID_HANDLE != rsiHandle)
+    CheckInitResult(initResult, (INVALID_HANDLE != maFastHandle), "Ma fast handle init error");
+    CheckInitResult(initResult, (INVALID_HANDLE != maMiddleHandle), "Ma middle handle init error");
+    CheckInitResult(initResult, (INVALID_HANDLE != maSlowHandle), "Ma slow handle init error");
+    CheckInitResult(initResult, (INVALID_HANDLE != rsiHandle), "Ma rsi handle init error");
+
+    CheckInitResult(initResult, (InpValueMaFast > 0), "Ma fast should be bigger than 0");
+    CheckInitResult(initResult, (InpValueMaMiddle > 0), "Ma middle should be bigger than 0");
+    CheckInitResult(initResult, (InpValueMaSlow > 0), "Ma slow should be bigger than 0");
+
+    CheckInitResult(initResult, (InpValueMaFast < InpValueMaMiddle), "Ma fast should be smaller than ma middle");
+    CheckInitResult(initResult, (InpValueMaMiddle < InpValueMaSlow), "Ma middle should be smaller than ma slow");
+    CheckInitResult(initResult, (InpLots > 0), "Lots should be bigger than 0");
+    CheckInitResult(initResult, (InpValueRsiFilterThresholdDistance >= 0), "RSI Filter threshold should be bigger than 0 or 0");
+    CheckInitResult(initResult, (InpSmallTryFactor > 0), "Small try factor should be bigger than 0");
+    CheckInitResult(initResult, (InpDepositLoad >= 0), "Deposit load percentage should be bigger than 0 or 0");
+
+    if (initResult)
     {
         return (INIT_SUCCEEDED);
     }
@@ -94,6 +115,7 @@ void OnDeinit(const int reason)
 
 void OnTick()
 {
+
     if (!IsNewBar() && isFilterCandleOn)
     {
         return;
@@ -116,7 +138,7 @@ void OnTick()
     // 1 for uptrend, 0 unknown, -1 for downtrend
     int trendDirection = getTrendDirection(bufferMaFast, bufferMaMiddle, bufferMaSlow);
 
-    if (InpMaSizeFilter >= 0 && trendDirection != 0 && ShouldBeFiltered(trendDirection, bufferMaSlow, bufferMaFast))
+    if (InpMaSizeFilter > 0 && trendDirection != 0 && ShouldBeFiltered(trendDirection, bufferMaSlow, bufferMaFast))
     {
         return;
     }
@@ -185,9 +207,19 @@ void OnTick()
     //     }
     // }
 
+    if (InpDepositLoad > 0 && ShouldBeFilteredDepositLoad())
+    {
+        return;
+    }
+
     if (trendDirection == 1)
     {
         ShouldBuy(bufferMaFast, bufferMaMiddle, bufferMaSlow, bufferRsi);
+    }
+
+    if (trendDirection == -1)
+    {
+        // ShouldSell(bufferMaFast, bufferMaMiddle, bufferMaSlow, bufferRsi);
     }
 
     // //    if (trendDirection == 1 ) {
@@ -283,11 +315,12 @@ void ShouldBuy(double &bufferMaFast[], double &bufferMaMiddle[], double &bufferM
 
         if (!trade.PositionOpen(_Symbol, ORDER_TYPE_BUY, currentLot, previousTick.ask, sl, tp, "fu"))
         {
-            PrintFormat("❌[ShouldBuy]: ", "PositionOpen Buy failed: sl %d; tp: %d; lots: %d, || %s :: %s",
+            PrintFormat("❌[ShouldBuy]: ", "PositionOpen failed: sl %d; tp: %d; lots: %d, || %s :: %s",
                         sl, tp, currentLot,
                         trade.ResultRetcode(),
                         trade.ResultRetcodeDescription());
         }
+
         isFilterCandleOn = true;
         return;
     }
@@ -308,7 +341,7 @@ void ShouldBuy(double &bufferMaFast[], double &bufferMaMiddle[], double &bufferM
 
         if (!trade.PositionOpen(_Symbol, ORDER_TYPE_BUY, halfLot, previousTick.ask, sl, tp, "me"))
         {
-            PrintFormat("❌[ShouldBuy]: ", "PositionOpen Buy failed: sl %d; tp: %d; lots: %d, || %s :: %s",
+            PrintFormat("❌[ShouldBuy]: ", "PositionOpen failed: sl %d; tp: %d; lots: %d, || %s :: %s",
                         sl, tp, halfLot,
                         trade.ResultRetcode(),
                         trade.ResultRetcodeDescription());
@@ -319,12 +352,13 @@ void ShouldBuy(double &bufferMaFast[], double &bufferMaMiddle[], double &bufferM
 
     if (currentTick.bid <= bufferMaFast[0])
     {
-        Print("ShouldBuy - should by 0.25 of stake - just a small try");
+        // Print("ShouldBuy - should by 0.25 of stake - just a small try");
 
-        // if(InpValueRsiFilterThresholdDistance > 0 && bufferRsi[0] > InpValueRsiFilterThresholdDistance + 30) {
-        //     Print("RSI filter #ON - filtered out");
-        //     return;
-        // }
+        if (InpValueRsiFilterThresholdDistance > 0 && bufferRsi[0] > InpValueRsiFilterThresholdDistance + 30)
+        {
+            // Print("RSI filter #ON - filtered out");
+            return;
+        }
 
         double sl = NormalizeDouble(bufferMaMiddle[0], _Digits);
         double tp = NormalizeDouble(((currentTick.bid - bufferMaMiddle[0]) * InpSmallTryFactor) + currentTick.bid, _Digits);
@@ -338,7 +372,98 @@ void ShouldBuy(double &bufferMaFast[], double &bufferMaMiddle[], double &bufferM
 
         if (!trade.PositionOpen(_Symbol, ORDER_TYPE_BUY, quaterOfLot, previousTick.ask, sl, tp, "sm"))
         {
-            PrintFormat("❌[ShouldBuy]: ", "PositionOpen Buy failed: sl %d; tp: %d; lots: %d, || %s :: %s",
+            PrintFormat("❌[ShouldBuy]: ", "PositionOpen failed: sl %d; tp: %d; lots: %d, || %s :: %s",
+                        sl, tp, quaterOfLot,
+                        trade.ResultRetcode(),
+                        trade.ResultRetcodeDescription());
+        }
+        isFilterCandleOn = true;
+        return;
+    }
+}
+
+void ShouldSell(double &bufferMaFast[], double &bufferMaMiddle[], double &bufferMaSlow[], double &bufferRsi[])
+{
+    double slowMarginValue = bufferMaSlow[0] + (InpSlowMargin * _Point);
+    if (currentTick.bid >= slowMarginValue)
+    {
+        // Print("ShouldSell - nothing should happen - below slow margin zone");
+        return;
+    }
+
+    if (currentTick.bid <= bufferMaSlow[0] + slowMarginValue && bufferMaSlow[0] <= currentTick.bid)
+    {
+        Print("ShouldSell - full lot - slow margin zone");
+
+        double sl = NormalizeDouble(slowMarginValue, _Digits);
+        double tp = NormalizeDouble(bufferMaFast[0], _Digits);
+
+        double currentLot = InpLots;
+        if (!CheckLots(currentLot))
+        {
+            Print("ShouldSell - CheckLots failed");
+            return;
+        }
+
+        if (!trade.PositionOpen(_Symbol, ORDER_TYPE_SELL, currentLot, previousTick.bid, sl, tp, "fu"))
+        {
+            PrintFormat("❌[ShouldSell]: ", "PositionOpen failed: sl %d; tp: %d; lots: %d, || %s :: %s",
+                        sl, tp, currentLot,
+                        trade.ResultRetcode(),
+                        trade.ResultRetcodeDescription());
+        }
+        isFilterCandleOn = true;
+        return;
+    }
+
+    if (currentTick.bid <= bufferMaSlow[0] && bufferMaMiddle[0] <= currentTick.bid)
+    {
+        Print("ShouldSell - should by 0.5 of stake - we are close");
+
+        double sl = NormalizeDouble(bufferMaSlow[0], _Digits);
+        double tp = NormalizeDouble(bufferMaFast[0], _Digits);
+
+        double halfLot = InpLots / 2;
+        if (!CheckLots(halfLot))
+        {
+            Print("ShouldSell - CheckLots failed");
+            return;
+        }
+
+        if (!trade.PositionOpen(_Symbol, ORDER_TYPE_SELL, halfLot, previousTick.bid, sl, tp, "me"))
+        {
+            PrintFormat("❌[ShouldSell]: ", "PositionOpen failed: sl %d; tp: %d; lots: %d, || %s :: %s",
+                        sl, tp, halfLot,
+                        trade.ResultRetcode(),
+                        trade.ResultRetcodeDescription());
+        }
+        isFilterCandleOn = true;
+        return;
+    }
+
+    if (bufferMaFast[0] <= currentTick.bid)
+    {
+        // Print("ShouldSell - should by 0.25 of stake - just a small try");
+
+        if (InpValueRsiFilterThresholdDistance > 0 && bufferRsi[0] < 70 - InpValueRsiFilterThresholdDistance)
+        {
+            // Print("RSI filter #ON - filtered out");
+            return;
+        }
+
+        double sl = NormalizeDouble(bufferMaMiddle[0], _Digits);
+        double tp = NormalizeDouble(((currentTick.bid - bufferMaMiddle[0]) * InpSmallTryFactor) + currentTick.bid, _Digits);
+
+        double quaterOfLot = InpLots / 4;
+        if (!CheckLots(quaterOfLot))
+        {
+            Print("ShouldSell - CheckLots failed");
+            return;
+        }
+
+        if (!trade.PositionOpen(_Symbol, ORDER_TYPE_SELL, quaterOfLot, previousTick.bid, sl, tp, "sm"))
+        {
+            PrintFormat("❌[ShouldSell]: ", "PositionOpen failed: sl %d; tp: %d; lots: %d, || %s :: %s",
                         sl, tp, quaterOfLot,
                         trade.ResultRetcode(),
                         trade.ResultRetcodeDescription());
@@ -401,4 +526,30 @@ bool ShouldBeFiltered(int trendDirection, double &bufferMaSlow[], double &buffer
     }
 
     return false;
+}
+
+void CheckInitResult(bool &initResult, bool condition, string message)
+{
+    if (!condition)
+    {
+        Print(message);
+        initResult = false;
+    }
+}
+
+bool ShouldBeFilteredDepositLoad()
+{
+    double accountBallanceValue = AccountInfoDouble(ACCOUNT_BALANCE);
+    double marginUsedValue = accountBallanceValue - AccountInfoDouble(ACCOUNT_MARGIN_FREE);
+    double userPercentage = (marginUsedValue / accountBallanceValue) * 100;
+
+    if (userPercentage > InpDepositLoad)
+    {
+        Print("❌ Filtered out trade due to deposit load filtering");
+        return true;
+    }
+    else
+    {
+        return false;
+    }
 }
