@@ -12,10 +12,10 @@
 input group "===General input===" static input long InpMagicNumber = 830766;
 enum LOT_MODE_ENUM
 {
-  LOT_MODE_FIXED,         // Fixed lot value
-  LOT_MODE_MONEY,         // Risk exact amount of money per trade
-  LOT_MODE_PCT_ACCOUNT,   // Risk exact percentage of account balance per trade
-  LOT_MODE_PCT_EQUITY     // Risk exact part of account equity per trade
+  LOT_MODE_FIXED,       // Fixed lot value
+  LOT_MODE_MONEY,       // Risk exact amount of money per trade
+  LOT_MODE_PCT_ACCOUNT, // Risk exact percentage of account balance per trade
+  LOT_MODE_PCT_EQUITY   // Risk exact part of account equity per trade
 };
 input LOT_MODE_ENUM InpLotMode = LOT_MODE_FIXED;
 input double InpLots = 0.01;
@@ -29,7 +29,6 @@ enum STOP_LOSS_ENUM
 input STOP_LOSS_ENUM InpStopLossMode = VALUE;
 input int InpStopLoss = 150;
 input int InpTakeProfit = 200;
-
 
 input group "===Range inputs===" input int InpRangeStart = 600; // Time for open range in minutes from 0:00 (600 min = 10:00)
 input int InpRangeDuration = 120;                               // Time for range in minutes
@@ -380,14 +379,14 @@ void CheckBreakouts()
   double limitDown = InpFilterFromDownRange * _Point;
   if (range.f_entry && InpFilterFromUpRange > 0 && rangeInPoints > limitTop)
   {
-    Print("Range filter #ON lenght", (string) rangeInPoints, " is above limit ", (string) limitTop,". Skipping");
+    Print("Range filter #ON lenght", (string)rangeInPoints, " is above limit ", (string)limitTop, ". Skipping");
     range.f_entry = false;
     return;
   }
 
   if (range.f_entry && InpFilterFromDownRange > 0 && limitDown > rangeInPoints)
   {
-    Print("Range filter #ON lenght", (string) rangeInPoints, " is below limit ", (string) limitDown,". Skipping");
+    Print("Range filter #ON lenght", (string)rangeInPoints, " is below limit ", (string)limitDown, ". Skipping");
     range.f_entry = false;
     return;
   }
@@ -429,17 +428,17 @@ void CheckBreakouts()
       double lots;
       if (!CalculateLots(lastTick.bid - sl, lots))
       {
-        Print("❌[BreakoutEA.mq5:432]: ", "!CalculateLots(lastTick.bid - sl, lots)");
+        Print("❌[BreakoutEA.mq5:431]: ", "!CalculateLots(lastTick.bid - sl, lots)");
         return;
       }
 
       // open buy
-      if(!trade.PositionOpen(_Symbol, ORDER_TYPE_BUY, lots, lastTick.ask, sl, tp,
-                         "time range ea")) 
+      if (!trade.PositionOpen(_Symbol, ORDER_TYPE_BUY, lots, lastTick.ask, sl, tp,
+                              "time range ea"))
       {
-        Print("❌[BreakoutEA.mq5:440]: ","PositionOpen Buy failed: sl ", (string)sl, " tp: ", (string)tp, " lots: ", (string)lots,
-          (string)trade.ResultRetcode() + ":" +
-          trade.ResultRetcodeDescription());
+        Print("❌[BreakoutEA.mq5:439]: ", "PositionOpen Buy failed: sl ", (string)sl, " tp: ", (string)tp, " lots: ", (string)lots,
+              (string)trade.ResultRetcode() + ":" +
+                  trade.ResultRetcodeDescription());
       }
     }
 
@@ -460,7 +459,7 @@ void CheckBreakouts()
       if (InpStopLossMode == HALF_CHANNEL)
       {
         sl = NormalizeDouble(
-            range.high - (range.high - range.low),
+            ((range.high - range.low) / 2) + range.low,
             _Digits);
       }
 
@@ -478,17 +477,17 @@ void CheckBreakouts()
       double lots;
       if (!CalculateLots(sl - lastTick.ask, lots))
       {
-        Print("❌[BreakoutEA.mq5:481]: ", "!CalculateLots(sl - lastTick.ask, lots)");
+        Print("❌[BreakoutEA.mq5:480]: ", "!CalculateLots(sl - lastTick.ask, lots)");
         return;
       }
 
       // open sell
       if (!trade.PositionOpen(_Symbol, ORDER_TYPE_SELL, lots, lastTick.ask, sl, tp,
-                         "time range ea")) 
+                              "time range ea"))
       {
-        Print("❌[BreakoutEA.mq5:489]: ","PositionOpen Sell failed: sl ", (string)sl, " tp: ", (string)tp, " lots: ", (string)lots,
-          (string)trade.ResultRetcode() + ":" +
-          trade.ResultRetcodeDescription());
+        Print("❌[BreakoutEA.mq5:488]: ", "PositionOpen Sell failed: sl ", (string)sl, " tp: ", (string)tp, " lots: ", (string)lots,
+              (string)trade.ResultRetcode() + ":" +
+                  trade.ResultRetcodeDescription());
       }
     }
   }
@@ -678,7 +677,7 @@ bool CalculateLots(double slDistance, double &lots)
       Print("❌[BreakoutEA.mq5]: ", "moneyVolumeStep equal 0 , slDistance = ", slDistance, " tickSize ", tickSize, " tickValue ", tickValue, " volumeStep ", volumeStep);
       return false;
     }
-    Print("TEST ","moneyVolumeStep = ", moneyVolumeStep, ", slDistance = ", slDistance, " tickSize ", tickSize, " tickValue ", tickValue, " volumeStep ", volumeStep);
+    Print("TEST ", "moneyVolumeStep = ", moneyVolumeStep, ", slDistance = ", slDistance, " tickSize ", tickSize, " tickValue ", tickValue, " volumeStep ", volumeStep);
 
     lots = MathFloor(riskMoney / moneyVolumeStep) * volumeStep;
   }
