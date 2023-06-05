@@ -51,6 +51,11 @@ int rsiHandle;
 MqlTick previousTick;
 MqlTick currentTick;
 bool isFilterCandleOn = false;
+enum TRAIL_SL_MODE
+{
+    OFF,                 // Off
+    BY_CURRENT_LOWER_EMA // All entries will be trailed by previous EMA
+};
 
 CTrade trade;
 
@@ -61,6 +66,7 @@ input int InpValueMaMiddle = 50;
 input int InpValueMaSlow = 100;
 input int InpSlowMargin = 100;
 input double InpLots = 0.1;
+input TRAIL_SL_MODE InpTrailingSl = OFF;
 
 input group "====Filtering setup====";
 input int InpValueRsi = 6;                              // RSI setup; step=1
@@ -115,6 +121,17 @@ void OnDeinit(const int reason)
 
 void OnTick()
 {
+    // read values from indicators
+    double bufferMaFast[], bufferMaMiddle[], bufferMaSlow[], bufferRsi[];
+    CopyBuffer(maFastHandle, 0, 0, 1, bufferMaFast);
+    CopyBuffer(maMiddleHandle, 0, 0, 1, bufferMaMiddle);
+    CopyBuffer(maSlowHandle, 0, 0, 1, bufferMaSlow);
+    CopyBuffer(rsiHandle, 0, 0, 1, bufferRsi);
+
+    if (InpTrailingSl == BY_CURRENT_LOWER_EMA)
+    {
+        TrailByLowerEma(bufferMaMiddle);
+    }
 
     if (!IsNewBar() && isFilterCandleOn)
     {
@@ -128,12 +145,6 @@ void OnTick()
         return;
     }
 
-    // read values from indicators
-    double bufferMaFast[], bufferMaMiddle[], bufferMaSlow[], bufferRsi[];
-    CopyBuffer(maFastHandle, 0, 0, 1, bufferMaFast);
-    CopyBuffer(maMiddleHandle, 0, 0, 1, bufferMaMiddle);
-    CopyBuffer(maSlowHandle, 0, 0, 1, bufferMaSlow);
-    CopyBuffer(rsiHandle, 0, 0, 1, bufferRsi);
 
     // 1 for uptrend, 0 unknown, -1 for downtrend
     int trendDirection = getTrendDirection(bufferMaFast, bufferMaMiddle, bufferMaSlow);
@@ -144,50 +155,6 @@ void OnTick()
     }
 
     double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
-
-    // int positions = 0;
-
-    // for (int i = PositionsTotal() - 1; i >= 0; i--)
-    // {
-    //     ulong posTicket = PositionGetTicket(i);
-    //     if (PositionSelectByTicket(posTicket))
-    //     {
-    //         if (PositionGetString(POSITION_SYMBOL) == _Symbol && PositionGetInteger(POSITION_MAGIC) == InpMagicNumber)
-    //         {
-    //             positions = positions + 1;
-
-    //             if (PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY)
-    //             {
-    //                 if (PositionGetDouble(POSITION_VOLUME) >= InpLots)
-    //                 {
-
-    //                     double tp = PositionGetDouble(POSITION_PRICE_OPEN) + (PositionGetDouble(POSITION_PRICE_OPEN) - PositionGetDouble(POSITION_SL));
-
-    //                     if (bid >= tp)
-    //                     {
-    //                         if (trade.PositionClosePartial(posTicket, NormalizeDouble(PositionGetDouble(POSITION_VOLUME) / 2, 2)))
-    //                         {
-    //                             double sl = PositionGetDouble(POSITION_PRICE_OPEN);
-    //                             sl = NormalizeDouble(sl, _Digits);
-    //                             if (trade.PositionModify(posTicket, sl, 0))
-    //                             {
-    //                             }
-    //                         }
-    //                     }
-    //                 }
-    //                 else
-    //                 {
-    //                     int lowest = iLowest(_Symbol, PERIOD_M5, MODE_LOW, 3, 1);
-    //                     double sl = PositionGetDouble(POSITION_PRICE_OPEN);
-    //                     sl = NormalizeDouble(sl, _Digits);
-    //                     if (trade.PositionModify(posTicket, sl, 0))
-    //                     {
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
 
     // int orders = 0;
 
@@ -221,44 +188,6 @@ void OnTick()
     {
         // ShouldSell(bufferMaFast, bufferMaMiddle, bufferMaSlow, bufferRsi);
     }
-
-    // //    if (trendDirection == 1 ) {
-    // if (bufferMaFast[0] > bufferMaMiddle[0] && bufferMaMiddle[0] > bufferMaSlow[0])
-    // {
-    //     if (bid <= bufferMaFast[0])
-    //     {
-    //         if (positions + orders <= 0)
-    //         {
-    //             int indexHighest = iHighest(_Symbol, PERIOD_M5, MODE_HIGH, 5, 1);
-    //             double highPrice = iHigh(_Symbol, PERIOD_M5, indexHighest);
-    //             highPrice = NormalizeDouble(highPrice, _Digits);
-
-    //             double sl = iLow(_Symbol, PERIOD_M5, 0) - 30 * _Point;
-    //             sl = NormalizeDouble(sl, _Digits);
-
-    //             trade.BuyStop(InpLots, highPrice, _Symbol, sl);
-    //         }
-    //     }
-    // }
-
-    // //    } else if (trendDirection == -1 ) {
-    // if (bufferMaFast[0] < bufferMaMiddle[0] && bufferMaMiddle[0] < bufferMaSlow[0])
-    // {
-    //     if (bid >= bufferMaFast[0])
-    //     {
-    //         if (positions + orders <= 0)
-    //         {
-    //             int indexLowest = iLowest(_Symbol, PERIOD_M5, MODE_LOW, 5, 1);
-    //             double lowestPrice = iLow(_Symbol, PERIOD_M5, indexLowest);
-
-    //             double sl = iHigh(_Symbol, PERIOD_M5, 0) + 30 * _Point;
-    //             sl = NormalizeDouble(sl, _Digits);
-
-    //             trade.SellStop(InpLots, lowestPrice, _Symbol, sl);
-    //         }
-    //     }
-    // }
-    // //    }
 }
 
 bool IsNewBar()
@@ -295,7 +224,7 @@ void ShouldBuy(double &bufferMaFast[], double &bufferMaMiddle[], double &bufferM
     double slowMarginValue = bufferMaSlow[0] - (InpSlowMargin * _Point);
     if (currentTick.bid <= slowMarginValue)
     {
-        // Print("ShouldBuy - nothing should happen - below slow margin zone");
+        Print("ShouldBuy - nothing should happen - below slow margin zone");
         return;
     }
 
@@ -352,11 +281,11 @@ void ShouldBuy(double &bufferMaFast[], double &bufferMaMiddle[], double &bufferM
 
     if (currentTick.bid <= bufferMaFast[0])
     {
-        // Print("ShouldBuy - should by 0.25 of stake - just a small try");
+        Print("ShouldBuy - should by 0.25 of stake - just a small try");
 
         if (InpValueRsiFilterThresholdDistance > 0 && bufferRsi[0] > InpValueRsiFilterThresholdDistance + 30)
         {
-            // Print("RSI filter #ON - filtered out");
+            Print("RSI filter #ON - filtered out");
             return;
         }
 
@@ -387,7 +316,7 @@ void ShouldSell(double &bufferMaFast[], double &bufferMaMiddle[], double &buffer
     double slowMarginValue = bufferMaSlow[0] + (InpSlowMargin * _Point);
     if (currentTick.bid >= slowMarginValue)
     {
-        // Print("ShouldSell - nothing should happen - below slow margin zone");
+        Print("ShouldSell - nothing should happen - below slow margin zone");
         return;
     }
 
@@ -443,11 +372,11 @@ void ShouldSell(double &bufferMaFast[], double &bufferMaMiddle[], double &buffer
 
     if (bufferMaFast[0] <= currentTick.bid)
     {
-        // Print("ShouldSell - should by 0.25 of stake - just a small try");
+        Print("ShouldSell - should by 0.25 of stake - just a small try");
 
         if (InpValueRsiFilterThresholdDistance > 0 && bufferRsi[0] < 70 - InpValueRsiFilterThresholdDistance)
         {
-            // Print("RSI filter #ON - filtered out");
+            Print("RSI filter #ON - filtered out");
             return;
         }
 
@@ -551,5 +480,46 @@ bool ShouldBeFilteredDepositLoad()
     else
     {
         return false;
+    }
+}
+
+void TrailByLowerEma(double &bufferMaMiddle[])
+{
+    for (int i = PositionsTotal() - 1; i >= 0; i--)
+    {
+        ulong posTicket = PositionGetTicket(i);
+        if (PositionSelectByTicket(posTicket))
+        {
+            if (PositionGetString(POSITION_SYMBOL) == _Symbol && PositionGetInteger(POSITION_MAGIC) == InpMagicNumber)
+            {
+                if (PositionGetString(POSITION_COMMENT) == "sm")
+                {
+                    if (PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY) {
+                        double currentSl = PositionGetDouble(POSITION_SL);
+                        double currentTp = PositionGetDouble(POSITION_TP);
+                        double possibleSl = NormalizeDouble(bufferMaMiddle[0], _Digits);
+                        if (currentSl < possibleSl)
+                        {
+                            if (trade.PositionModify(posTicket, possibleSl, currentTp))
+                            {
+                                Print("TrailByLowerEma - position buy modified from sl: %d to new sl: %d",  currentSl, possibleSl);
+                            }
+                        }
+                    } 
+                    if (PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_SELL) {
+                        double currentSl = PositionGetDouble(POSITION_SL);
+                        double currentTp = PositionGetDouble(POSITION_TP);
+                        double possibleSl = NormalizeDouble(bufferMaMiddle[0], _Digits);
+                        if (currentSl > possibleSl)
+                        {
+                            if (trade.PositionModify(posTicket, possibleSl, currentTp))
+                            {
+                                Print("TrailByLowerEma - position sell modified from sl: %d to new sl: %d",  currentSl, possibleSl);
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }

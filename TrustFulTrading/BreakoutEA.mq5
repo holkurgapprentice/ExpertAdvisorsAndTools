@@ -13,12 +13,12 @@ input group "===General input===";
 static input long InpMagicNumber = 830766;
 enum LOT_MODE_ENUM
 {
-  LOT_MODE_FIXED,       // Fixed lot value
+  OFF,       // Fixed lot value
   LOT_MODE_MONEY,       // Risk exact amount of money per trade
   LOT_MODE_PCT_ACCOUNT, // Risk exact percentage of account balance per trade
   LOT_MODE_PCT_EQUITY   // Risk exact part of account equity per trade
 };
-input LOT_MODE_ENUM InpLotMode = LOT_MODE_FIXED;
+input LOT_MODE_ENUM InpLotMode = OFF;
 input double InpLots = 0.01;
 
 enum STOP_LOSS_ENUM
@@ -628,7 +628,7 @@ void DrawObjects()
 bool CalculateLots(double slDistance, double &lots)
 {
   lots = 0.0;
-  if (InpLotMode == LOT_MODE_FIXED)
+  if (InpLotMode == OFF)
   {
     lots = InpLots;
     if (!CheckLots(lots))
