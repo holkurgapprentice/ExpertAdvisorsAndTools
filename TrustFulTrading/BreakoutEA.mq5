@@ -9,17 +9,13 @@
 
 #include <Trade\Trade.mqh>
 
-input group "===General input===";
-static input long InpMagicNumber = 830766;
 enum LOT_MODE_ENUM
 {
-  OFF,       // Fixed lot value
+  OFF,                  // Fixed lot value
   LOT_MODE_MONEY,       // Risk exact amount of money per trade
   LOT_MODE_PCT_ACCOUNT, // Risk exact percentage of account balance per trade
   LOT_MODE_PCT_EQUITY   // Risk exact part of account equity per trade
 };
-input LOT_MODE_ENUM InpLotMode = OFF;
-input double InpLots = 0.01;
 
 enum STOP_LOSS_ENUM
 {
@@ -27,31 +23,14 @@ enum STOP_LOSS_ENUM
   HALF_CHANNEL,
   VALUE
 };
-input STOP_LOSS_ENUM InpStopLossMode = VALUE;
-input int InpStopLoss = 150;
-input int InpTakeProfit = 200;
-
-input group "===Range inputs===" input int InpRangeStart = 600; // Time for open range in minutes from 0:00 (600 min = 10:00)
-input int InpRangeDuration = 120;                               // Time for range in minutes
-input int InpRangeClose = 1200;                                 // Time for close positions in minutes from 0:00 (1200 min = 20:00)
-input bool InpHandleLongTimeSpans = false;                      // If timespan start on the end of a day, there is no need to wait for upcoming day
-input int InpFilterFromUpRange = 0;                             // If range high-low is higher than this value filter out transaction
-input int InpFilterFromDownRange = 0;                           // If range high-low is lower than this value filter out transaction
 
 enum BREAKOUT_MODE_ENUM
 {
   ONE_SIGNAL,
   TWO_SIGNALS
 };
-input BREAKOUT_MODE_ENUM InpBreakoutMode = ONE_SIGNAL;
 
-input group "===Day of week filter===" input bool InpMonday = true;
-input bool InpTuesday = true;
-input bool InpWednesday = true;
-input bool InpThursday = true;
-input bool InpFriday = true;
-
-struct RANGE_STRUCT
+struct POSTION_SUMMARY_STRUCT
 {
   datetime start_time;
   datetime end_time;
@@ -62,16 +41,46 @@ struct RANGE_STRUCT
   bool f_high_breakout;
   bool f_low_breakout;
 
-  RANGE_STRUCT() : start_time(0),
-                   end_time(0),
-                   close_time(9),
-                   high(0),
-                   low(DBL_MAX),
-                   f_entry(false),
-                   f_high_breakout(false),
-                   f_low_breakout(false){};
+  POSTION_SUMMARY_STRUCT() : start_time(0),
+                             end_time(0),
+                             close_time(9),
+                             high(0),
+                             low(DBL_MAX),
+                             f_entry(false),
+                             f_high_breakout(false),
+                             f_low_breakout(false){};
 };
-RANGE_STRUCT range;
+
+input group "===General input===";
+input long InpMagicNumber = 830766;
+input LOT_MODE_ENUM InpLotMode = OFF;
+input double InpLots = 0.01;
+input STOP_LOSS_ENUM InpStopLossMode = VALUE;
+input int InpStopLoss = 150;
+input int InpTakeProfit = 200;
+
+input group "===Range inputs===";
+input int InpRangeStart = 600;             // Time for open range in minutes from 0:00 (600 min = 10:00)
+input int InpRangeDuration = 120;          // Time for range in minutes
+input int InpRangeClose = 1200;            // Time for close positions in minutes from 0:00 (1200 min = 20:00)
+input bool InpHandleLongTimeSpans = false; // If time span start on the end of a day, there is no need to wait for upcoming day
+
+input group "===Custom filters===";
+input int InpFilterFromUpRange = 0;   // If range high-low is higher than this value filter out transaction
+input int InpFilterFromDownRange = 0; // If range high-low is lower than this value filter out transaction
+input bool InpBuyOn = true;           // If false, filter out buy transactions
+input bool InpSellOn = true;          // If false, filter out sell transactions
+input BREAKOUT_MODE_ENUM InpBreakoutMode = ONE_SIGNAL;
+input int InpBreakEvenFromPoints = 0; // Break event from N points; 0=off
+
+input group "===Day of week filter===";
+input bool InpMonday = true;
+input bool InpTuesday = true;
+input bool InpWednesday = true;
+input bool InpThursday = true;
+input bool InpFriday = true;
+
+POSTION_SUMMARY_STRUCT range;
 MqlTick prevTick, lastTick;
 CTrade trade;
 bool calcSpan = false;
@@ -86,7 +95,7 @@ int OnInit()
 
   trade.SetExpertMagicNumber(InpMagicNumber);
 
-  if (_UninitReason == REASON_PARAMETERS && CountOpenPositons() == 0)
+  if (_UninitReason == REASON_PARAMETERS && CountOpenPositions() == 0)
   {
     CalculateRange();
   }
@@ -127,6 +136,9 @@ void OnTick()
     }
   }
 
+  // manage open positions
+  ManageOpenPositionForeach();
+
   // close positions
   if (InpRangeClose >= 0 && lastTick.time >= range.close_time) // close time init set to 0
   {
@@ -142,7 +154,7 @@ void OnTick()
        (range.end_time == 0) ||
        (range.end_time != 0 && lastTick.time > range.end_time &&
         !range.f_entry)) &&
-      CountOpenPositons() == 0)
+      CountOpenPositions() == 0)
   {
     CalculateRange();
   }
@@ -198,6 +210,12 @@ bool CheckInputs()
   if (InpMonday + InpTuesday + InpWednesday + InpThursday + InpFriday == 0)
   {
     Alert("All week filtered nothing to trade");
+    return false;
+  }
+
+  if (InpBreakEvenFromPoints < 0)
+  {
+    Alert("InpBreakEvenFromPoints below 0");
     return false;
   }
 
@@ -341,7 +359,7 @@ void IfWeekendMoveToWorkingDay(int direction, datetime &date)
   }
 }
 
-int CountOpenPositons()
+int CountOpenPositions()
 {
   int counter = 0;
   int total = PositionsTotal();
@@ -361,7 +379,7 @@ int CountOpenPositons()
     ulong magicNumber;
     if (!PositionGetInteger(POSITION_MAGIC, magicNumber))
     {
-      Print("Failed to get magicnumber from position");
+      Print("Failed to get magic number from position");
       return -1;
     }
     if (InpMagicNumber == magicNumber)
@@ -380,14 +398,14 @@ void CheckBreakouts()
   double limitDown = InpFilterFromDownRange * _Point;
   if (range.f_entry && InpFilterFromUpRange > 0 && rangeInPoints > limitTop)
   {
-    Print("Range filter #ON lenght", (string)rangeInPoints, " is above limit ", (string)limitTop, ". Skipping");
+    Print("Range filter #ON length", (string)rangeInPoints, " is above limit ", (string)limitTop, ". Skipping");
     range.f_entry = false;
     return;
   }
 
   if (range.f_entry && InpFilterFromDownRange > 0 && limitDown > rangeInPoints)
   {
-    Print("Range filter #ON lenght", (string)rangeInPoints, " is below limit ", (string)limitDown, ". Skipping");
+    Print("Range filter #ON length", (string)rangeInPoints, " is below limit ", (string)limitDown, ". Skipping");
     range.f_entry = false;
     return;
   }
@@ -402,11 +420,11 @@ void CheckBreakouts()
         range.f_low_breakout = true;
       }
 
-      double sl;
+      double sl = 0;
       // calc sl tp
       if (InpStopLossMode == VALUE)
       {
-        sl = InpStopLoss == 0 ? 0 : NormalizeDouble(lastTick.bid - (InpTakeProfit * _Point), _Digits);
+        sl = InpStopLoss == 0 ? 0 : NormalizeDouble(lastTick.bid - (InpStopLoss * _Point), _Digits);
       }
       if (InpStopLossMode == HALF_CHANNEL)
       {
@@ -429,15 +447,15 @@ void CheckBreakouts()
       double lots;
       if (!CalculateLots(lastTick.bid - sl, lots))
       {
-        Print("❌[BreakoutEA.mq5:432]: ", "!CalculateLots(lastTick.bid - sl, lots)");
+        Print("❌[BreakoutEA.mq5:450]: ", "!CalculateLots(lastTick.bid - sl, lots)");
         return;
       }
 
       // open buy
-      if (!trade.PositionOpen(_Symbol, ORDER_TYPE_BUY, lots, lastTick.ask, sl, tp,
-                              "time range ea"))
+      if (InpBuyOn && !trade.PositionOpen(_Symbol, ORDER_TYPE_BUY, lots, lastTick.ask, sl, tp,
+                                          "time range ea"))
       {
-        Print("❌[BreakoutEA.mq5:440]: ", "PositionOpen Buy failed: sl ", (string)sl, " tp: ", (string)tp, " lots: ", (string)lots,
+        Print("❌[BreakoutEA.mq5:458]: ", "PositionOpen Buy failed: sl ", (string)sl, " tp: ", (string)tp, " lots: ", (string)lots,
               (string)trade.ResultRetcode() + ":" +
                   trade.ResultRetcodeDescription());
       }
@@ -452,7 +470,7 @@ void CheckBreakouts()
       }
 
       // calc sl tp
-      double sl;
+      double sl = 0;
       if (InpStopLossMode == VALUE)
       {
         sl = InpStopLoss == 0 ? 0 : NormalizeDouble(lastTick.ask + (InpStopLoss * _Point), _Digits);
@@ -478,15 +496,15 @@ void CheckBreakouts()
       double lots;
       if (!CalculateLots(sl - lastTick.ask, lots))
       {
-        Print("❌[BreakoutEA.mq5:481]: ", "!CalculateLots(sl - lastTick.ask, lots)");
+        Print("❌[BreakoutEA.mq5:499]: ", "!CalculateLots(sl - lastTick.ask, lots)");
         return;
       }
 
       // open sell
-      if (!trade.PositionOpen(_Symbol, ORDER_TYPE_SELL, lots, lastTick.bid, sl, tp,
-                              "time range ea"))
+      if (InpSellOn && !trade.PositionOpen(_Symbol, ORDER_TYPE_SELL, lots, lastTick.bid, sl, tp,
+                                           "time range ea"))
       {
-        Print("❌[BreakoutEA.mq5:489]: ", "PositionOpen Sell failed: sl ", (string)sl, " tp: ", (string)tp, " lots: ", (string)lots,
+        Print("❌[BreakoutEA.mq5:507]: ", "PositionOpen Sell failed: sl ", (string)sl, " tp: ", (string)tp, " lots: ", (string)lots,
               (string)trade.ResultRetcode() + ":" +
                   trade.ResultRetcodeDescription());
       }
@@ -519,7 +537,7 @@ bool ClosePositions()
     ulong magicNumber;
     if (!PositionGetInteger(POSITION_MAGIC, magicNumber))
     {
-      Print("Failed to get magicnumber from position");
+      Print("Failed to get magic number from position");
       return false;
     }
     if (InpMagicNumber == magicNumber)
@@ -594,7 +612,7 @@ void DrawObjects()
     ObjectSetInteger(NULL, "range high", OBJPROP_BACK, true);
 
     ObjectCreate(NULL, "range high", OBJ_TREND, 0, range.end_time, range.high,
-                 InpRangeClose >= 0 ? range.close_time : INT_MAX, range.high);
+                 InpRangeClose >= 0 ? range.close_time : (datetime)INT_MAX, range.high);
     ObjectSetString(
         NULL, "range high", OBJPROP_TOOLTIP,
         "high of the range \n" + DoubleToString(range.high, _Digits));
@@ -616,7 +634,7 @@ void DrawObjects()
     ObjectSetInteger(NULL, "range low", OBJPROP_BACK, true);
 
     ObjectCreate(NULL, "range low", OBJ_TREND, 0, range.end_time, range.low,
-                 InpRangeClose >= 0 ? range.close_time : INT_MAX, range.low);
+                 InpRangeClose >= 0 ? range.close_time : (datetime)INT_MAX, range.low);
     ObjectSetString(NULL, "range low", OBJPROP_TOOLTIP,
                     "low of the range \n" + DoubleToString(range.low, _Digits));
     ObjectSetInteger(NULL, "range low", OBJPROP_COLOR, clrBlue);
@@ -653,7 +671,7 @@ bool CalculateLots(double slDistance, double &lots)
     double tickValue = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE);
     double volumeStep = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_STEP);
 
-    double riskMoney;
+    double riskMoney = 0;
 
     if (InpLotMode == LOT_MODE_MONEY)
     {
@@ -678,7 +696,6 @@ bool CalculateLots(double slDistance, double &lots)
       Print("❌[BreakoutEA.mq5]: ", "moneyVolumeStep equal 0 , slDistance = ", slDistance, " tickSize ", tickSize, " tickValue ", tickValue, " volumeStep ", volumeStep);
       return false;
     }
-    Print("TEST ", "moneyVolumeStep = ", moneyVolumeStep, ", slDistance = ", slDistance, " tickSize ", tickSize, " tickValue ", tickValue, " volumeStep ", volumeStep);
 
     lots = MathFloor(riskMoney / moneyVolumeStep) * volumeStep;
   }
@@ -757,4 +774,108 @@ bool IsLastClosedTransactionInCurrentRange()
     }
   }
     */
+}
+
+void ManageOpenPositionForeach()
+{
+
+  int total = PositionsTotal();
+  for (int i = total - 1; i >= 0; i--)
+  {
+    ulong ticket = PositionGetTicket(i);
+    if (ticket <= 0)
+    {
+      Print("Failed to get position ticket");
+      return;
+    }
+    if (!PositionSelectByTicket(ticket))
+    {
+      Print("Failed to select pos by ticket");
+      return;
+    }
+    ulong magicNumber;
+    if (!PositionGetInteger(POSITION_MAGIC, magicNumber))
+    {
+      Print("Failed to get magic number from position");
+      return;
+    }
+    if (InpMagicNumber == magicNumber)
+    {
+      // do your stuff
+      if (InpBreakEvenFromPoints > 0)
+      {
+        SetSlToBreakEven(ticket);
+      }
+
+      // end your stuff
+    }
+  }
+}
+
+void SetSlToBreakEven(ulong ticket)
+{
+  double openPrice = 0;
+  if (!PositionGetDouble(POSITION_PRICE_OPEN, openPrice))
+  {
+    Print("Failed to get open price");
+    return;
+  }
+
+  long positionType = 0;
+  if (!PositionGetInteger(POSITION_TYPE, positionType))
+  {
+    Print("Failed to get position type");
+    return;
+  }
+
+  double sl = 0;
+  if (!PositionGetDouble(POSITION_SL, sl))
+  {
+    Print("Failed to get position sl");
+    return;
+  }
+
+  double tp = 0;
+  if (!PositionGetDouble(POSITION_TP, tp))
+  {
+    Print("Failed to get position tp");
+    return;
+  }
+
+  if (positionType == POSITION_TYPE_BUY) {
+    if (sl >= openPrice) {
+      return;
+    }
+
+    double currentPrice = lastTick.ask;
+    double currentDistancePoints = ( currentPrice-openPrice ) / _Point;
+
+    if (currentDistancePoints < 0 || currentDistancePoints < InpBreakEvenFromPoints) {
+      return;
+    }
+
+    if (!trade.PositionModify(ticket, openPrice, tp)) {
+      Print("Failed to set buy sl to break even");
+      return;
+    }
+  }
+  
+  
+  if (positionType == POSITION_TYPE_SELL) {
+    if (sl <= openPrice) {
+      return;
+    }
+
+    double currentPrice = lastTick.bid;
+    double currentDistancePoints = ( openPrice-currentPrice ) / _Point;
+
+    if (currentDistancePoints < 0 || currentDistancePoints < InpBreakEvenFromPoints) {
+      return;
+    }
+
+    if (!trade.PositionModify(ticket, openPrice, tp)) {
+      Print("Failed to set sell sl to break even");
+      return;
+    }
+  }
 }
