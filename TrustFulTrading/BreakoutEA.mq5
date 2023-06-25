@@ -1,5 +1,6 @@
+// https://www.youtube.com/watch?v=I84L4O081XA
 //+------------------------------------------------------------------+
-//|                                               BollingerBands.mq5 |
+//|                                                   BreakoutEA.mq5 |
 //|                                  Copyright 2022, MetaQuotes Ltd. |
 //|                                             https://www.mql5.com |
 //+------------------------------------------------------------------+
@@ -71,7 +72,12 @@ input int InpFilterFromDownRange = 0; // If range high-low is lower than this va
 input bool InpBuyOn = true;           // If false, filter out buy transactions
 input bool InpSellOn = true;          // If false, filter out sell transactions
 input BREAKOUT_MODE_ENUM InpBreakoutMode = ONE_SIGNAL;
+
+input group "===Money saving===";
 input int InpBreakEvenFromPoints = 0; // Break event from N points; 0=off
+input int InpTrailingStopLoss = 0;    // Move sl up after N points from last; 0=off
+input double InpTrailingStopAtr = 0;     // Move sl by multiply ATR; 0=off
+input int InpTrailingStopAtrPeriod = 14; // ATR period
 
 input group "===Day of week filter===";
 input bool InpMonday = true;
@@ -85,6 +91,7 @@ MqlTick prevTick, lastTick;
 CTrade trade;
 bool calcSpan = false;
 int time_cycle = 86400; // whole day in minutes
+int atrHandle;
 
 int OnInit()
 {
@@ -100,6 +107,8 @@ int OnInit()
     CalculateRange();
   }
 
+  atrHandle = iATR(_Symbol, _Period, InpTrailingStopAtrPeriod);
+
   DrawObjects();
 
   return (INIT_SUCCEEDED);
@@ -108,6 +117,12 @@ int OnInit()
 void OnDeinit(const int reason)
 {
   ObjectDelete(NULL, "range");
+  ObjectDelete(NULL, "range start");
+  ObjectDelete(NULL, "range end");
+  ObjectDelete(NULL, "range close");
+  ObjectDelete(NULL, "range high");
+  ObjectDelete(NULL, "range low");
+  IndicatorRelease(atrHandle);
 }
 
 void OnTick()
@@ -212,10 +227,28 @@ bool CheckInputs()
     Alert("All week filtered nothing to trade");
     return false;
   }
-
+ 
   if (InpBreakEvenFromPoints < 0)
   {
     Alert("InpBreakEvenFromPoints below 0");
+    return false;
+  }
+
+  if (InpTrailingStopAtr > 0 && InpTrailingStopLoss > 0)
+  {
+    Alert("InpTrailingStopAtr and InpTrailingStopLoss can't be both > 0");
+    return false;
+  }
+
+  if (InpTrailingStopLoss != 0 && InpTakeProfit != 0 && InpTrailingStopLoss >= InpTakeProfit)
+  {
+    Alert("InpTrailingStopLoss >= InpTakeProfit");
+    return false;
+  }
+
+  if (InpTrailingStopAtr == 0 && InpTrailingStopAtrPeriod != 0)
+  {
+    Alert("Setup obsolete InpTrailingStopAtrPeriod != 0 && InpTrailingStopAtr == 0");
     return false;
   }
 
@@ -447,15 +480,15 @@ void CheckBreakouts()
       double lots;
       if (!CalculateLots(lastTick.bid - sl, lots))
       {
-        Print("❌[BreakoutEA.mq5:450]: ", "!CalculateLots(lastTick.bid - sl, lots)");
+        Print("❌[BreakoutEA.mq5:483]: ", "!CalculateLots(lastTick.bid - sl, lots)");
         return;
       }
 
       // open buy
       if (InpBuyOn && !trade.PositionOpen(_Symbol, ORDER_TYPE_BUY, lots, lastTick.ask, sl, tp,
-                                          "time range ea"))
+                                          "BreakoutEA"))
       {
-        Print("❌[BreakoutEA.mq5:458]: ", "PositionOpen Buy failed: sl ", (string)sl, " tp: ", (string)tp, " lots: ", (string)lots,
+        Print("❌[BreakoutEA.mq5:491]: ", "PositionOpen Buy failed: sl ", (string)sl, " tp: ", (string)tp, " lots: ", (string)lots,
               (string)trade.ResultRetcode() + ":" +
                   trade.ResultRetcodeDescription());
       }
@@ -496,15 +529,15 @@ void CheckBreakouts()
       double lots;
       if (!CalculateLots(sl - lastTick.ask, lots))
       {
-        Print("❌[BreakoutEA.mq5:499]: ", "!CalculateLots(sl - lastTick.ask, lots)");
+        Print("❌[BreakoutEA.mq5:532]: ", "!CalculateLots(sl - lastTick.ask, lots)");
         return;
       }
 
       // open sell
       if (InpSellOn && !trade.PositionOpen(_Symbol, ORDER_TYPE_SELL, lots, lastTick.bid, sl, tp,
-                                           "time range ea"))
+                                           "BreakoutEA"))
       {
-        Print("❌[BreakoutEA.mq5:507]: ", "PositionOpen Sell failed: sl ", (string)sl, " tp: ", (string)tp, " lots: ", (string)lots,
+        Print("❌[BreakoutEA.mq5:540]: ", "PositionOpen Sell failed: sl ", (string)sl, " tp: ", (string)tp, " lots: ", (string)lots,
               (string)trade.ResultRetcode() + ":" +
                   trade.ResultRetcodeDescription());
       }
@@ -807,6 +840,16 @@ void ManageOpenPositionForeach()
         SetSlToBreakEven(ticket);
       }
 
+      if (InpTrailingStopAtr > 0)
+      {
+        SetTrailingStopAtr(ticket);
+      }
+
+      if (InpTrailingStopLoss > 0)
+      {
+        SetTrailingStopLoss(ticket);
+      }
+
       // end your stuff
     }
   }
@@ -842,39 +885,179 @@ void SetSlToBreakEven(ulong ticket)
     return;
   }
 
-  if (positionType == POSITION_TYPE_BUY) {
-    if (sl >= openPrice) {
+  if (positionType == POSITION_TYPE_BUY)
+  {
+    if (sl >= openPrice)
+    {
       return;
     }
 
     double currentPrice = lastTick.ask;
-    double currentDistancePoints = ( currentPrice-openPrice ) / _Point;
+    double currentDistancePoints = (currentPrice - openPrice) / _Point;
 
-    if (currentDistancePoints < 0 || currentDistancePoints < InpBreakEvenFromPoints) {
+    if (currentDistancePoints < 0 || currentDistancePoints < InpBreakEvenFromPoints)
+    {
       return;
     }
 
-    if (!trade.PositionModify(ticket, openPrice, tp)) {
+    if (!trade.PositionModify(ticket, openPrice, tp))
+    {
       Print("Failed to set buy sl to break even");
       return;
     }
   }
-  
-  
-  if (positionType == POSITION_TYPE_SELL) {
-    if (sl <= openPrice) {
+
+  if (positionType == POSITION_TYPE_SELL)
+  {
+    if (sl <= openPrice)
+    {
       return;
     }
 
     double currentPrice = lastTick.bid;
-    double currentDistancePoints = ( openPrice-currentPrice ) / _Point;
+    double currentDistancePoints = (openPrice - currentPrice) / _Point;
 
-    if (currentDistancePoints < 0 || currentDistancePoints < InpBreakEvenFromPoints) {
+    if (currentDistancePoints < 0 || currentDistancePoints < InpBreakEvenFromPoints)
+    {
       return;
     }
 
-    if (!trade.PositionModify(ticket, openPrice, tp)) {
+    if (!trade.PositionModify(ticket, openPrice, tp))
+    {
       Print("Failed to set sell sl to break even");
+      return;
+    }
+  }
+}
+
+void SetTrailingStopLoss(ulong ticket)
+{
+  double openPrice = 0;
+  if (!PositionGetDouble(POSITION_PRICE_OPEN, openPrice))
+  {
+    Print("Failed to get open price");
+    return;
+  }
+
+  long positionType = 0;
+  if (!PositionGetInteger(POSITION_TYPE, positionType))
+  {
+    Print("Failed to get position type");
+    return;
+  }
+
+  double sl = 0;
+  if (!PositionGetDouble(POSITION_SL, sl))
+  {
+    Print("Failed to get position sl");
+    return;
+  }
+
+  double tp = 0;
+  if (!PositionGetDouble(POSITION_TP, tp))
+  {
+    Print("Failed to get position tp");
+    return;
+  }
+
+  if (positionType == POSITION_TYPE_BUY)
+  {
+    double currentPrice = lastTick.ask;
+    double newStopLoss = NormalizeDouble(currentPrice - (InpTrailingStopLoss * _Point), _Digits);
+
+    if (newStopLoss <= sl)
+    {
+      return;
+    }
+
+    if (!trade.PositionModify(ticket, newStopLoss, tp))
+    {
+      Print("Failed to set buy sl to trailing stop loss");
+      return;
+    }
+  }
+
+  if (positionType == POSITION_TYPE_SELL)
+  {
+    double currentPrice = lastTick.bid;
+    double newStopLoss = NormalizeDouble(currentPrice + (InpTrailingStopLoss * _Point), _Digits);
+
+    if (newStopLoss >= sl)
+    {
+      return;
+    }
+
+    if (!trade.PositionModify(ticket, newStopLoss, tp))
+    {
+      Print("Failed to set sell sl to trailing stop loss");
+      return;
+    }
+  }
+}
+
+void SetTrailingStopAtr(ulong ticket)
+{
+  double atrBuffer[];
+  CopyBuffer(atrHandle, 0, 0, 1, atrBuffer);
+
+  double openPrice = 0;
+  if (!PositionGetDouble(POSITION_PRICE_OPEN, openPrice))
+  {
+    Print("Failed to get open price");
+    return;
+  }
+
+  long positionType = 0;
+  if (!PositionGetInteger(POSITION_TYPE, positionType))
+  {
+    Print("Failed to get position type");
+    return;
+  }
+
+  double sl = 0;
+  if (!PositionGetDouble(POSITION_SL, sl))
+  {
+    Print("Failed to get position sl");
+    return;
+  }
+
+  double tp = 0;
+  if (!PositionGetDouble(POSITION_TP, tp))
+  {
+    Print("Failed to get position tp");
+    return;
+  }
+
+  if (positionType == POSITION_TYPE_BUY)
+  {
+    double currentPrice = lastTick.ask;
+    double newStopLoss = NormalizeDouble(currentPrice - (atrBuffer[0] * InpTrailingStopAtr), _Digits);
+
+    if (newStopLoss <= sl)
+    {
+      return;
+    }
+
+    if (!trade.PositionModify(ticket, newStopLoss, tp))
+    {
+      Print("Failed to set buy sl to trailing stop loss by ATR multiplier");
+      return;
+    }
+  }
+
+  if (positionType == POSITION_TYPE_SELL)
+  {
+    double currentPrice = lastTick.bid;
+    double newStopLoss = NormalizeDouble(currentPrice + (atrBuffer[0] * InpTrailingStopAtr), _Digits);
+
+    if (newStopLoss >= sl)
+    {
+      return;
+    }
+
+    if (!trade.PositionModify(ticket, newStopLoss, tp))
+    {
+      Print("Failed to set sell sl to trailing stop loss by ATR multiplier");
       return;
     }
   }

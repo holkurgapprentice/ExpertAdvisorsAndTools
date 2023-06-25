@@ -1,3 +1,5 @@
+//https://www.youtube.com/watch?v=55c6GLm5Cf8
+
 //+------------------------------------------------------------------+
 //|                                              DonchainRanging.mq5 |
 //|                                  Copyright 2022, MetaQuotes Ltd. |
