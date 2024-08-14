@@ -27,11 +27,16 @@ input long InpMagicNumber = 813010;
 input LOT_MODE_ENUM InpLotMode = OFF;
 input double InpLots = 0.01;
 input int InpStopLoss = 1000;
-input int InpDaysExpiry = 3;                             // Days to expiry
-input int InpFilterToCloseTransactions = 0;              // If distance from open to order is lower than this value don't send order
-input int InpFilterToFarTransactions = 0;                // If distance from open to order is higher than this value don't send order
-input int InpBreakEvenFromPoints = 0;                    // Break event from N points; 0=off
+input int InpDaysExpiry = 3;                        // Days to expiry
+input int InpFilterToCloseTransactions = 0;         // If distance from open to order is lower than this value don't send order
+input int InpFilterToFarTransactions = 0;           // If distance from open to order is higher than this value don't send order
+input int InpBreakEvenFromPoints = 0;               // Break event from N points; 0=off
 input ENTRY_TYPE_ENUM InpEntryType = YHTL_IS_ENTRY; // YHTL Should be entry or TP
+input double InpTrailingStopAtrMultiplier = 0;      // Trailing stop loss multiply ATR; 0=off
+input int InpTrailingStopAtrPeriod = 14;            // Trailing stop loss loss ATR period
+//TODO [Timer] close on timer in minutes
+//TODO [Timer] set close timer method (only when in profit / only when in lose / always)
+//TODO [Filter trend] filtering trend with two high EMAs 100 and 150 - if 100 is before 150 then we have a trend and try to play with it
 
 input group "===Entry type related===";
 input double InpTakeProfitMultiplier = 1.5; // Take profit ATR multiply by
@@ -39,7 +44,7 @@ input int InputTpAtrPeriod = 14;            // ATR period for TP
 
 CTrade trade;
 MqlTick prevTick, lastTick;
-int atrHandle;
+int atrHandle, atrSlHandle;
 int time_cycle = 86400; // whole day in minutes
 string lastOpenedDescription;
 
@@ -47,19 +52,31 @@ int OnInit()
 {
     trade.SetExpertMagicNumber(InpMagicNumber);
     atrHandle = iATR(_Symbol, _Period, InputTpAtrPeriod);
+    atrSlHandle = iATR(_Symbol, _Period, InpTrailingStopAtrPeriod);
+    
+    bool initResult = true;
 
-    if (!CheckInputs())
-    {
-        return INIT_PARAMETERS_INCORRECT;
-    }
+	CheckInitResult(initResult, (InpDaysExpiry > 0), "Days to expiry should be greater than 0");
 
-    return INIT_SUCCEEDED;
+	if (initResult)
+	{
+		return (INIT_SUCCEEDED);
+	}
+	else
+	{
+		return (INIT_PARAMETERS_INCORRECT);
+	}
 }
 
-bool CheckInputs()
+void CheckInitResult(bool &initResult, bool condition, string message)
 {
-    return true;
+	if (!condition)
+	{
+		Print(message);
+		initResult = false;
+	}
 }
+
 
 void OnDeinit(const int reason)
 {
@@ -217,7 +234,7 @@ void SendOrder(string description, datetime expiry, double positionPrice, double
 
     if (!isOpenBelow && InpEntryType == YHTL_IS_TP)
     {
-        double tp = NormalizeDouble(positionPrice ,_Digits);
+        double tp = NormalizeDouble(positionPrice, _Digits);
         double entry = NormalizeDouble(positionPrice + atr * InpTakeProfitMultiplier, _Digits);
         double sl = NormalizeDouble(entry + (InpStopLoss * _Point), _Digits);
 
@@ -427,6 +444,11 @@ void ManageOpenPositionForeach()
                 SetSlToBreakEven(ticket);
             }
 
+            if (InpTrailingStopAtrMultiplier > 0)
+            {
+                SetTrailingStopAtr(ticket);
+            }
+
             // end your stuff
         }
     }
@@ -502,6 +524,74 @@ void SetSlToBreakEven(ulong ticket)
         if (!trade.PositionModify(ticket, openPrice, tp))
         {
             Print("Failed to set sell sl to break even");
+            return;
+        }
+    }
+}
+
+void SetTrailingStopAtr(ulong ticket)
+{
+    double atrBuffer[];
+    CopyBuffer(atrSlHandle, 0, 0, 1, atrBuffer);
+
+    double openPrice = 0;
+    if (!PositionGetDouble(POSITION_PRICE_OPEN, openPrice))
+    {
+        Print("Failed to get open price");
+        return;
+    }
+
+    long positionType = 0;
+    if (!PositionGetInteger(POSITION_TYPE, positionType))
+    {
+        Print("Failed to get position type");
+        return;
+    }
+
+    double sl = 0;
+    if (!PositionGetDouble(POSITION_SL, sl))
+    {
+        Print("Failed to get position sl");
+        return;
+    }
+
+    double tp = 0;
+    if (!PositionGetDouble(POSITION_TP, tp))
+    {
+        Print("Failed to get position tp");
+        return;
+    }
+
+    if (positionType == POSITION_TYPE_BUY)
+    {
+        double currentPrice = lastTick.ask;
+        double newStopLoss = NormalizeDouble(currentPrice - (atrBuffer[0] * InpTrailingStopAtrMultiplier), _Digits);
+
+        if (newStopLoss <= sl)
+        {
+            return;
+        }
+
+        if (!trade.PositionModify(ticket, newStopLoss, tp))
+        {
+            Print("Failed to set buy sl to trailing stop loss by ATR multiplier");
+            return;
+        }
+    }
+
+    if (positionType == POSITION_TYPE_SELL)
+    {
+        double currentPrice = lastTick.bid;
+        double newStopLoss = NormalizeDouble(currentPrice + (atrBuffer[0] * InpTrailingStopAtrMultiplier), _Digits);
+
+        if (newStopLoss >= sl)
+        {
+            return;
+        }
+
+        if (!trade.PositionModify(ticket, newStopLoss, tp))
+        {
+            Print("Failed to set sell sl to trailing stop loss by ATR multiplier");
             return;
         }
     }

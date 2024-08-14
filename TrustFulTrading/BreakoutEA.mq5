@@ -20,9 +20,15 @@ enum LOT_MODE_ENUM
 
 enum STOP_LOSS_ENUM
 {
-  NEGATIVE_END_CHANNEL,
-  HALF_CHANNEL,
-  VALUE
+  SL_NEGATIVE_END_CHANNEL, // Negative end channel
+  SL_HALF_CHANNEL,         // Half the channel
+  SL_VALUE                 // Value in points
+};
+
+enum TAKE_PROFIT_ENUM
+{
+  TP_CHANNEL_MULTIPLY, // Channel height will be multiplied by
+  TP_VALUE             // Value in points
 };
 
 enum BREAKOUT_MODE_ENUM
@@ -56,8 +62,9 @@ input group "===General input===";
 input long InpMagicNumber = 830766;
 input LOT_MODE_ENUM InpLotMode = OFF;
 input double InpLots = 0.01;
-input STOP_LOSS_ENUM InpStopLossMode = VALUE;
+input STOP_LOSS_ENUM InpStopLossMode = SL_VALUE;
 input int InpStopLoss = 150;
+input TAKE_PROFIT_ENUM InpTakeProfitMode = TP_VALUE;
 input int InpTakeProfit = 200;
 
 input group "===Range inputs===";
@@ -74,8 +81,8 @@ input bool InpSellOn = true;          // If false, filter out sell transactions
 input BREAKOUT_MODE_ENUM InpBreakoutMode = ONE_SIGNAL;
 
 input group "===Money saving===";
-input int InpBreakEvenFromPoints = 0; // Break event from N points; 0=off
-input int InpTrailingStopLoss = 0;    // Move sl up after N points from last; 0=off
+input int InpBreakEvenFromPoints = 0;    // Break event from N points; 0=off
+input int InpTrailingStopLoss = 0;       // Move sl up after N points from last; 0=off
 input double InpTrailingStopAtr = 0;     // Move sl by multiply ATR; 0=off
 input int InpTrailingStopAtrPeriod = 14; // ATR period
 
@@ -194,9 +201,9 @@ bool CheckInputs()
     Alert("InpStopLoss below 0");
     return false;
   }
-  if (InpStopLossMode != VALUE && InpStopLoss != 0)
+  if (InpStopLossMode != SL_VALUE && InpStopLoss != 0)
   {
-    Alert("InpStopLossMode != VALUE && InpStopLoss != 0");
+    Alert("InpStopLossMode != SL_VALUE && InpStopLoss != 0");
     return false;
   }
   if (InpRangeClose < 0)
@@ -227,7 +234,7 @@ bool CheckInputs()
     Alert("All week filtered nothing to trade");
     return false;
   }
- 
+
   if (InpBreakEvenFromPoints < 0)
   {
     Alert("InpBreakEvenFromPoints below 0");
@@ -240,7 +247,7 @@ bool CheckInputs()
     return false;
   }
 
-  if (InpTrailingStopLoss != 0 && InpTakeProfit != 0 && InpTrailingStopLoss >= InpTakeProfit)
+  if (InpTrailingStopLoss != 0 && InpTakeProfit != 0 && InpTakeProfitMode == TP_VALUE && InpTrailingStopLoss >= InpTakeProfit)
   {
     Alert("InpTrailingStopLoss >= InpTakeProfit");
     return false;
@@ -455,32 +462,40 @@ void CheckBreakouts()
 
       double sl = 0;
       // calc sl tp
-      if (InpStopLossMode == VALUE)
+      if (InpStopLossMode == SL_VALUE)
       {
-        sl = InpStopLoss == 0 ? 0 : NormalizeDouble(lastTick.bid - (InpStopLoss * _Point), _Digits);
+        sl = InpStopLoss == 0 ? 0 : NormalizeDouble(lastTick.ask - (InpStopLoss * _Point), _Digits);
       }
-      if (InpStopLossMode == HALF_CHANNEL)
+      if (InpStopLossMode == SL_HALF_CHANNEL)
       {
         sl = NormalizeDouble(
             ((range.high - range.low) / 2) + range.low,
             _Digits);
       }
 
-      if (InpStopLossMode == NEGATIVE_END_CHANNEL)
+      if (InpStopLossMode == SL_NEGATIVE_END_CHANNEL)
       {
         sl = NormalizeDouble(
             range.low,
             _Digits);
       }
 
-      double tp =
-          InpTakeProfit == 0 ? 0 : NormalizeDouble(lastTick.bid + (InpTakeProfit * _Point), _Digits);
+      double tp = 0;
+      if (InpTakeProfitMode == TP_VALUE)
+      {
+        tp = InpTakeProfit == 0 ? 0 : NormalizeDouble(lastTick.ask + (InpTakeProfit * _Point), _Digits);
+      }
+
+      if (InpTakeProfitMode == TP_CHANNEL_MULTIPLY)
+      {
+        tp = NormalizeDouble(lastTick.ask + ((range.high - range.low) * InpTakeProfit), _Digits);
+      }
 
       // calc lots
       double lots;
-      if (!CalculateLots(lastTick.bid - sl, lots))
+      if (!CalculateLots(lastTick.ask - sl, lots))
       {
-        Print("❌[BreakoutEA.mq5:483]: ", "!CalculateLots(lastTick.bid - sl, lots)");
+        Print("❌[BreakoutEA.mq5:498]: ", "!CalculateLots(lastTick.ask - sl, lots)");
         return;
       }
 
@@ -488,7 +503,7 @@ void CheckBreakouts()
       if (InpBuyOn && !trade.PositionOpen(_Symbol, ORDER_TYPE_BUY, lots, lastTick.ask, sl, tp,
                                           "BreakoutEA"))
       {
-        Print("❌[BreakoutEA.mq5:491]: ", "PositionOpen Buy failed: sl ", (string)sl, " tp: ", (string)tp, " lots: ", (string)lots,
+        Print("❌[BreakoutEA.mq5:506]: ", "PositionOpen Buy failed: sl ", (string)sl, " tp: ", (string)tp, " lots: ", (string)lots,
               (string)trade.ResultRetcode() + ":" +
                   trade.ResultRetcodeDescription());
       }
@@ -504,32 +519,40 @@ void CheckBreakouts()
 
       // calc sl tp
       double sl = 0;
-      if (InpStopLossMode == VALUE)
+      if (InpStopLossMode == SL_VALUE)
       {
-        sl = InpStopLoss == 0 ? 0 : NormalizeDouble(lastTick.ask + (InpStopLoss * _Point), _Digits);
+        sl = InpStopLoss == 0 ? 0 : NormalizeDouble(lastTick.bid + (InpStopLoss * _Point), _Digits);
       }
-      if (InpStopLossMode == HALF_CHANNEL)
+      if (InpStopLossMode == SL_HALF_CHANNEL)
       {
         sl = NormalizeDouble(
             ((range.high - range.low) / 2) + range.low,
             _Digits);
       }
 
-      if (InpStopLossMode == NEGATIVE_END_CHANNEL)
+      if (InpStopLossMode == SL_NEGATIVE_END_CHANNEL)
       {
         sl = NormalizeDouble(
             range.high,
             _Digits);
       }
 
-      double tp =
-          InpTakeProfit == 0 ? 0 : NormalizeDouble(lastTick.ask - (InpTakeProfit * _Point), _Digits);
+      double tp = 0;
+      if (InpTakeProfitMode == TP_VALUE)
+      {
+        tp = InpTakeProfit == 0 ? 0 : NormalizeDouble(lastTick.bid - (InpTakeProfit * _Point), _Digits);
+      }
+
+      if (InpTakeProfitMode == TP_CHANNEL_MULTIPLY)
+      {
+        tp = NormalizeDouble(lastTick.bid - ((range.high - range.low) * InpTakeProfit), _Digits);
+      }
 
       // calc lots
       double lots;
-      if (!CalculateLots(sl - lastTick.ask, lots))
+      if (!CalculateLots(sl - lastTick.bid, lots))
       {
-        Print("❌[BreakoutEA.mq5:532]: ", "!CalculateLots(sl - lastTick.ask, lots)");
+        Print("❌[BreakoutEA.mq5:555]: ", "!CalculateLots(sl - lastTick.bid, lots)");
         return;
       }
 
@@ -537,7 +560,7 @@ void CheckBreakouts()
       if (InpSellOn && !trade.PositionOpen(_Symbol, ORDER_TYPE_SELL, lots, lastTick.bid, sl, tp,
                                            "BreakoutEA"))
       {
-        Print("❌[BreakoutEA.mq5:540]: ", "PositionOpen Sell failed: sl ", (string)sl, " tp: ", (string)tp, " lots: ", (string)lots,
+        Print("❌[BreakoutEA.mq5:563]: ", "PositionOpen Sell failed: sl ", (string)sl, " tp: ", (string)tp, " lots: ", (string)lots,
               (string)trade.ResultRetcode() + ":" +
                   trade.ResultRetcodeDescription());
       }
@@ -787,7 +810,7 @@ bool IsLastClosedTransactionInCurrentRange()
 {
   return false;
   /*
-  // todo find a way to check if last closed position due to force close or TP / SL was done in current range breakout bounds
+  // TODO find a way to check if last closed position due to force close or TP / SL was done in current range breakout bounds
   for (int i = HistoryDealsTotal() - 1; i >= 0; i--) {
     ulong dealTicket = HistoryDealGetTicket(i);
     if (HistoryDealSelect(dealTicket)) {
