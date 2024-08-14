@@ -15,6 +15,7 @@ double projectedLoss = 0;
 //--- input parameters
 input bool IsLogginEnabled = false;
 input int RedRiskLevel = 20;
+input bool IsHorizontalOrientation = true;
 
 string objectLabels[] = {
     "Risk",
@@ -43,7 +44,8 @@ int OnInit()
 {
   // create a timer with a N second period
   EventSetTimer(3);
-  if(RedRiskLevel <= 0 || RedRiskLevel > 1000) {
+  if (RedRiskLevel <= 0 || RedRiskLevel > 1000)
+  {
     MessageBox("RedRiskLevel should be between 1 and 1000", "Error", MB_ICONERROR);
     return (INIT_FAILED);
   }
@@ -379,11 +381,22 @@ void DrawLabel(int row, string objectName, string text, int clr, int column = 0)
 {
   if (ObjectFind(0, objectName) == -1)
   {
-    ObjectCreate(0, objectName, OBJ_LABEL, 0, 0, 0);
-    ObjectSetInteger(0, objectName, OBJPROP_CORNER, CORNER_LEFT_LOWER);
-    ObjectSetInteger(0, objectName, OBJPROP_COLOR, clr);
-    ObjectSetInteger(0, objectName, OBJPROP_XDISTANCE, (column * 180) + 10);
-    ObjectSetInteger(0, objectName, OBJPROP_YDISTANCE, (row + 1) * 18);
+    if(IsHorizontalOrientation) 
+    {
+      ObjectCreate(0, objectName, OBJ_LABEL, 0, 0, 0);
+      ObjectSetInteger(0, objectName, OBJPROP_CORNER, CORNER_LEFT_LOWER);
+      ObjectSetInteger(0, objectName, OBJPROP_COLOR, clr);
+      ObjectSetInteger(0, objectName, OBJPROP_XDISTANCE, (column * 180) + 10);
+      ObjectSetInteger(0, objectName, OBJPROP_YDISTANCE, (row + 1) * 18);
+    }
+    else
+    {
+      ObjectCreate(0, objectName, OBJ_LABEL, 0, 0, 0);
+      ObjectSetInteger(0, objectName, OBJPROP_CORNER, CORNER_LEFT_LOWER);
+      ObjectSetInteger(0, objectName, OBJPROP_COLOR, clr);
+      ObjectSetInteger(0, objectName, OBJPROP_XDISTANCE, 10);
+      ObjectSetInteger(0, objectName, OBJPROP_YDISTANCE, ((row + 1) * 18) + (column * 7 * 18));
+    }
   }
 
   ObjectSetString(0, objectName, OBJPROP_TEXT, text);
