@@ -9,8 +9,8 @@
 
 // Global variables
 double currentResult = 0;
-double projectedWin = 0;
-double projectedLoss = 0;
+double projWin = 0;
+double projLoss = 0;
 
 //--- input parameters
 input bool IsLogginEnabled = false;
@@ -19,9 +19,9 @@ input bool IsHorizontalOrientation = true;
 
 string objectLabels[] = {
     "Risk",
-    "ProjectedLoss",
+    "ProjLoss",
     "CurrentResult",
-    "ProjectedWin",
+    "ProjWin",
     "WithoutTpOrSl",
     "Label"};
 
@@ -352,27 +352,27 @@ void DisplayResults()
 {
   // order
   DrawLabel(0, "Order" + objectLabels[0], StringFormat("Risk: %.2f%%", orderSummary.risk), orderSummary.risk < RedRiskLevel ? clrBlue : clrRed);
-  DrawLabel(1, "Order" + objectLabels[1], StringFormat("Projected Loss: %.2f", orderSummary.loss), clrRed);
-  DrawLabel(2, "Order" + objectLabels[2], StringFormat("Current Result: %.2f", orderSummary.currentResult), clrBlack);
-  DrawLabel(3, "Order" + objectLabels[3], StringFormat("Projected Win: %.2f", orderSummary.profit), clrGreen);
-  DrawLabel(4, "Order" + objectLabels[4], StringFormat("Without SL/TP: %.0f", orderSummary.withoutTpOrSl), clrGray);
-  DrawLabel(5, "Order" + objectLabels[5], "-=Orders summary=-", clrDarkBlue);
+  DrawLabel(1, "Order" + objectLabels[1], StringFormat("Proj Loss: %.2f", orderSummary.loss), clrRed);
+  DrawLabel(2, "Order" + objectLabels[2], StringFormat("Cur Res: %.2f", orderSummary.currentResult), clrBlack);
+  DrawLabel(3, "Order" + objectLabels[3], StringFormat("Proj Win: %.2f", orderSummary.profit), clrGreen);
+  DrawLabel(4, "Order" + objectLabels[4], StringFormat("With SL/TP: %.0f", orderSummary.withoutTpOrSl), clrGray);
+  DrawLabel(5, "Order" + objectLabels[5], "-=Ord sum=-", clrDarkBlue);
 
   // position
   DrawLabel(0, "Position" + objectLabels[0], StringFormat("Risk: %.2f%%", positionSummary.risk), positionSummary.risk < RedRiskLevel ? clrBlue : clrRed, 1);
-  DrawLabel(1, "Position" + objectLabels[1], StringFormat("Projected Loss: %.2f", positionSummary.loss), clrRed, 1);
-  DrawLabel(2, "Position" + objectLabels[2], StringFormat("Current Result: %.2f", positionSummary.currentResult), clrBlack, 1);
-  DrawLabel(3, "Position" + objectLabels[3], StringFormat("Projected Win: %.2f", positionSummary.profit), clrGreen, 1);
-  DrawLabel(4, "Position" + objectLabels[4], StringFormat("Without SL/TP: %.0f", positionSummary.withoutTpOrSl), clrGray, 1);
-  DrawLabel(5, "Position" + objectLabels[5], "-=Positions summary=-", clrDarkBlue, 1);
+  DrawLabel(1, "Position" + objectLabels[1], StringFormat("Proj Loss: %.2f", positionSummary.loss), clrRed, 1);
+  DrawLabel(2, "Position" + objectLabels[2], StringFormat("Cur Res: %.2f", positionSummary.currentResult), clrBlack, 1);
+  DrawLabel(3, "Position" + objectLabels[3], StringFormat("Proj Win: %.2f", positionSummary.profit), clrGreen, 1);
+  DrawLabel(4, "Position" + objectLabels[4], StringFormat("With SL/TP: %.0f", positionSummary.withoutTpOrSl), clrGray, 1);
+  DrawLabel(5, "Position" + objectLabels[5], "-=Pos sum=-", clrDarkBlue, 1);
 
   // combined
-  DrawLabel(0, "Summary" + objectLabels[0], StringFormat("Risk: %.2f%%", orderSummary.risk + positionSummary.risk), orderSummary.risk + positionSummary.risk < RedRiskLevel ? clrBlue : clrRed, 2);
-  DrawLabel(1, "Summary" + objectLabels[1], StringFormat("Projected Loss: %.2f", orderSummary.loss + positionSummary.loss), clrRed, 2);
-  DrawLabel(2, "Summary" + objectLabels[2], StringFormat("Current Result: %.2f", orderSummary.currentResult + positionSummary.currentResult), clrBlack, 2);
-  DrawLabel(3, "Summary" + objectLabels[3], StringFormat("Projected Win: %.2f", orderSummary.profit + positionSummary.profit), clrGreen, 2);
-  DrawLabel(4, "Summary" + objectLabels[4], StringFormat("Without SL/TP: %.0f", orderSummary.withoutTpOrSl + positionSummary.withoutTpOrSl), clrGray, 2);
-  DrawLabel(5, "Summary" + objectLabels[5], "-=Combined summary=-", clrDarkBlue, 2);
+  DrawLabel(0, "Summary" + objectLabels[0], StringFormat("Risk: %.2f%%", orderSummary.risk + positionSummary.risk), (orderSummary.risk + positionSummary.risk) < RedRiskLevel ? clrBlue : clrRed, 2);
+  DrawLabel(1, "Summary" + objectLabels[1], StringFormat("Proj Loss: %.2f", orderSummary.loss + positionSummary.loss), clrRed, 2);
+  DrawLabel(2, "Summary" + objectLabels[2], StringFormat("Cur Res: %.2f", orderSummary.currentResult + positionSummary.currentResult), clrBlack, 2);
+  DrawLabel(3, "Summary" + objectLabels[3], StringFormat("Proj Win: %.2f", orderSummary.profit + positionSummary.profit), clrGreen, 2);
+  DrawLabel(4, "Summary" + objectLabels[4], StringFormat("With SL/TP: %.0f", orderSummary.withoutTpOrSl + positionSummary.withoutTpOrSl), clrGray, 2);
+  DrawLabel(5, "Summary" + objectLabels[5], "-=Comb sum=-", clrDarkBlue, 2);
 
   ChartRedraw();
 }
@@ -386,7 +386,7 @@ void DrawLabel(int row, string objectName, string text, int clr, int column = 0)
       ObjectCreate(0, objectName, OBJ_LABEL, 0, 0, 0);
       ObjectSetInteger(0, objectName, OBJPROP_CORNER, CORNER_LEFT_LOWER);
       ObjectSetInteger(0, objectName, OBJPROP_COLOR, clr);
-      ObjectSetInteger(0, objectName, OBJPROP_XDISTANCE, (column * 180) + 10);
+      ObjectSetInteger(0, objectName, OBJPROP_XDISTANCE, (column * 135) + 10);
       ObjectSetInteger(0, objectName, OBJPROP_YDISTANCE, (row + 1) * 18);
     }
     else
