@@ -16,6 +16,7 @@ double projLoss = 0;
 input bool IsLogginEnabled = false;
 input int RedRiskLevel = 20;
 input bool IsHorizontalOrientation = true;
+input bool InpPresentBELine = true;
 
 string objectLabels[] = {
     "Risk",
@@ -74,6 +75,7 @@ void OnDeinit(const int reason)
     ObjectsDeleteAll(0, "Position" + objectLabels[i]);
     ObjectsDeleteAll(0, "Summary" + objectLabels[i]);
   }
+  ObjectsDeleteAll(0, "BreakEven_Line");
 }
 //+------------------------------------------------------------------+
 //| Expert tick function                                             |
@@ -98,6 +100,7 @@ void CalculateResults()
 {
   CalculateOrderResults();
   CalculatePositionResults();
+  CalcBreakEven();
 }
 
 void CalculatePositionResults()
@@ -347,6 +350,95 @@ void CalculateOrderResults()
   }
 }
 
+void CalcBreakEven()
+{
+  if (!InpPresentBELine)
+    return;
+
+  int buyCount = 0;
+  int sellCount = 0;
+  double totalBuySize = 0;
+  double totalBuyPrice = 0;
+  double totalSellSize = 0;
+  double totalSellPrice = 0;
+
+  for (int i = PositionsTotal() - 1; i >= 0; i--)
+  {
+    ulong ticket = PositionGetTicket(i);
+
+    if (!PositionSelectByTicket(ticket))
+    {
+      PrintFormat("PositionSelectByTicket failed");
+      continue;
+    }
+
+    string symbol;
+    if (!PositionGetString(POSITION_SYMBOL, symbol) || symbol != Symbol())
+    {
+      continue;
+    }
+
+    double price;
+    if (!PositionGetDouble(POSITION_PRICE_OPEN, price))
+    {
+      continue;
+    }
+
+    double lots;
+    if (!PositionGetDouble(POSITION_VOLUME, lots))
+    {
+      continue;
+    }
+
+    long positionType;
+    if (!PositionGetInteger(POSITION_TYPE, positionType))
+    {
+      continue;
+    }
+    else
+    {
+      switch ((int)positionType)
+      {
+      case POSITION_TYPE_BUY:
+      {
+        buyCount++;
+        totalBuyPrice += price * lots;
+        totalBuySize += lots;
+        break;
+      }
+      case POSITION_TYPE_SELL:
+      {
+        sellCount++;
+        totalSellPrice += price * lots;
+        totalSellSize += lots;
+        break;
+      }
+      default:
+        continue;
+        break;
+      }
+    }
+  }
+
+  if (totalBuyPrice > 0)
+  {
+    totalBuyPrice /= totalBuySize;
+  }
+
+  if (totalSellPrice > 0)
+  {
+    totalSellPrice /= totalSellSize;
+  }
+
+  ObjectCreate(0, "BreakEven_Line", OBJ_HLINE, 0, 0, totalBuyPrice > 0 ? totalBuyPrice : totalSellPrice);
+  ObjectSetInteger(0, "BreakEven_Line", OBJPROP_COLOR, clrGreen);
+  ObjectSetInteger(0, "BreakEven_Line", OBJPROP_WIDTH, 1);
+  ObjectSetInteger(0, "BreakEven_Line", OBJPROP_STYLE, STYLE_DASHDOTDOT);
+  ObjectSetInteger(0, "BreakEven_Line", OBJPROP_BACK, false);
+  string objectLabelBreakEvenLine = StringFormat(" BreakEven line at %.5f", (totalBuyPrice > 0 ? totalBuyPrice : totalSellPrice));
+  ObjectSetString(0, "BreakEven_Line", OBJPROP_TEXT, objectLabelBreakEvenLine);
+}
+
 // Display results on the chart
 void DisplayResults()
 {
@@ -381,7 +473,7 @@ void DrawLabel(int row, string objectName, string text, int clr, int column = 0)
 {
   if (ObjectFind(0, objectName) == -1)
   {
-    if(IsHorizontalOrientation) 
+    if (IsHorizontalOrientation)
     {
       ObjectCreate(0, objectName, OBJ_LABEL, 0, 0, 0);
       ObjectSetInteger(0, objectName, OBJPROP_CORNER, CORNER_LEFT_LOWER);
