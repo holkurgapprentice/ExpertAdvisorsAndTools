@@ -13,9 +13,9 @@ double projWin = 0;
 double projLoss = 0;
 
 //--- input parameters
-input bool IsLogginEnabled = false;
+input bool InpIsLogginEnabled = false;
 input int RedRiskLevel = 20;
-input bool IsHorizontalOrientation = true;
+input bool InpIsHorizontalOrientation = true;
 input bool InpPresentBELine = true;
 
 string objectLabels[] = {
@@ -43,6 +43,10 @@ SummaryDetail positionSummary;
 //+------------------------------------------------------------------+
 int OnInit()
 {
+  if (InpIsLogginEnabled)
+  {
+    PrintFormat("Init");
+  }
   // create a timer with a N second period
   EventSetTimer(3);
   if (RedRiskLevel <= 0 || RedRiskLevel > 1000)
@@ -66,6 +70,10 @@ void InitializeStruct(SummaryDetail &summary)
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
 {
+ if (InpIsLogginEnabled)
+  {
+    PrintFormat("Deinit");
+  }
   // destroy the timer after completing the work
   EventKillTimer();
   int Size = ArraySize(objectLabels);
@@ -102,6 +110,10 @@ void OnTick()
 //+------------------------------------------------------------------+
 void OnTimer()
 {
+   if (InpIsLogginEnabled)
+  {
+    PrintFormat("Timer hit");
+  }
   InitializeStruct(orderSummary);
   InitializeStruct(positionSummary);
   CalculateResults();
@@ -235,7 +247,7 @@ void CalculatePositionResults()
 
     positionSummary.risk = (positionSummary.loss / ballance) * 100;
 
-    if (IsLogginEnabled)
+    if (InpIsLogginEnabled)
     {
       PrintFormat("IsBuy: %s, PositionSelect: %d, Symbol: %s, Tp: %.5f, Price: %.5f, Sl: %.5f, TickValue: %.5f, TickSize: %.5f, Lots: %.2f, Profit: %.2f, Loss: %.2f, Result: %.2f, Risk: %.2f",
                   isBuy ? "true" : "false", ticket, symbol, tp, price, sl, tickValue, tickSize, lots, profit, loss, result, positionSummary.risk);
@@ -356,7 +368,7 @@ void CalculateOrderResults()
     double ballance = AccountInfoDouble(ACCOUNT_BALANCE);
     orderSummary.risk = (orderSummary.loss / ballance) * 100;
 
-    if (IsLogginEnabled)
+    if (InpIsLogginEnabled)
     {
       PrintFormat("IsBuy: %s, OrderSelect: %d, Symbol: %s, Tp: %.5f, Price: %.5f, Sl: %.5f, TickValue: %.5f, TickSize: %.5f, Lots: %.2f, Profit: %.2f, Loss: %.2f, Risk: %.2f",
                   isBuy ? "true" : "false", ticket, symbol, tp, price, sl, tickValue, tickSize, lots, profit, loss, orderSummary.risk);
@@ -495,27 +507,26 @@ void DisplayResults()
 void DrawLabel(int row, string objectName, string text, int clr, int column = 0)
 {
   if (ObjectFind(0, objectName) == -1)
-  {
-    if (IsHorizontalOrientation)
-    {
-      ObjectCreate(0, objectName, OBJ_LABEL, 0, 0, 0);
-      ObjectSetInteger(0, objectName, OBJPROP_CORNER, CORNER_LEFT_LOWER);
-      ObjectSetInteger(0, objectName, OBJPROP_COLOR, clr);
-      ObjectSetInteger(0, objectName, OBJPROP_XDISTANCE, (column * 100) + 10);
-      ObjectSetInteger(0, objectName, OBJPROP_YDISTANCE, (row + 1) * 13);
-    }
-    else
-    {
-      ObjectCreate(0, objectName, OBJ_LABEL, 0, 0, 0);
-      ObjectSetInteger(0, objectName, OBJPROP_CORNER, CORNER_LEFT_LOWER);
-      ObjectSetInteger(0, objectName, OBJPROP_COLOR, clr);
-      ObjectSetInteger(0, objectName, OBJPROP_XDISTANCE, 10);
-      ObjectSetInteger(0, objectName, OBJPROP_YDISTANCE, ((row + 1) * 18) + (column * 7 * 18));
-    }
+    ObjectCreate(0, objectName, OBJ_LABEL, 0, 0, 0);
 
-    ObjectSetInteger(0, objectName, OBJPROP_FONTSIZE, 8);
-    ObjectSetString(0, objectName, OBJPROP_TEXT, text);
+  if (InpIsHorizontalOrientation)
+  {
+    ObjectSetInteger(0, objectName, OBJPROP_CORNER, CORNER_LEFT_LOWER);
+    ObjectSetInteger(0, objectName, OBJPROP_COLOR, clr);
+    ObjectSetInteger(0, objectName, OBJPROP_XDISTANCE, (column * 100) + 10);
+    ObjectSetInteger(0, objectName, OBJPROP_YDISTANCE, (row + 1) * 13);
   }
+  else
+  {
+    
+    ObjectSetInteger(0, objectName, OBJPROP_CORNER, CORNER_LEFT_LOWER);
+    ObjectSetInteger(0, objectName, OBJPROP_COLOR, clr);
+    ObjectSetInteger(0, objectName, OBJPROP_XDISTANCE, 10);
+    ObjectSetInteger(0, objectName, OBJPROP_YDISTANCE, ((row + 1) * 18) + (column * 7 * 18));
+  }
+
+  ObjectSetInteger(0, objectName, OBJPROP_FONTSIZE, 8);
+  ObjectSetString(0, objectName, OBJPROP_TEXT, text);
 }
 
 double GetPercent(double value)
