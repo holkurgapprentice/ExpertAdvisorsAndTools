@@ -17,12 +17,15 @@ input bool InpIsLogginEnabled = false;
 input int RedRiskLevel = 20;
 input bool InpIsHorizontalOrientation = true;
 input bool InpPresentBELine = true;
+input color InpPresentBELineColor = clrGreen;
 
 string objectLabels[] = {
-    "Risk",
     "ProjLoss",
+    "ProjLossPerc",
     "CurrentResult",
+    "CurrentResultPerc",
     "ProjWin",
+    "ProjWinPerc",
     "WithoutTpOrSl",
     "Label"};
 
@@ -83,18 +86,6 @@ void OnDeinit(const int reason)
     ObjectsDeleteAll(0, "Position" + objectLabels[i]);
     ObjectsDeleteAll(0, "Summary" + objectLabels[i]);
   }
-
-  ObjectsDeleteAll(0, "Order" + objectLabels[1] + "Perc");
-  ObjectsDeleteAll(0, "Order" + objectLabels[2] + "Perc");
-  ObjectsDeleteAll(0, "Order" + objectLabels[3] + "Perc");
-
-  ObjectsDeleteAll(0, "Position" + objectLabels[1] + "Perc");
-  ObjectsDeleteAll(0, "Position" + objectLabels[2] + "Perc");
-  ObjectsDeleteAll(0, "Position" + objectLabels[3] + "Perc");
-
-  ObjectsDeleteAll(0, "Summary" + objectLabels[1] + "Perc");
-  ObjectsDeleteAll(0, "Summary" + objectLabels[2] + "Perc");
-  ObjectsDeleteAll(0, "Summary" + objectLabels[3] + "Perc");
 
   ObjectsDeleteAll(0, "BreakEven_Line");
 }
@@ -457,7 +448,7 @@ void CalcBreakEven()
   }
 
   ObjectCreate(0, "BreakEven_Line", OBJ_HLINE, 0, 0, totalBuyPrice > 0 ? totalBuyPrice : totalSellPrice);
-  ObjectSetInteger(0, "BreakEven_Line", OBJPROP_COLOR, clrGreen);
+  ObjectSetInteger(0, "BreakEven_Line", OBJPROP_COLOR, InpPresentBELineColor);
   ObjectSetInteger(0, "BreakEven_Line", OBJPROP_WIDTH, 1);
   ObjectSetInteger(0, "BreakEven_Line", OBJPROP_STYLE, STYLE_DASHDOTDOT);
   ObjectSetInteger(0, "BreakEven_Line", OBJPROP_BACK, true);
@@ -469,37 +460,34 @@ void CalcBreakEven()
 void DisplayResults()
 {
   // order
-  DrawLabel(0, "Order" + objectLabels[0], StringFormat("Risk: %.2f%%", orderSummary.risk), orderSummary.risk < RedRiskLevel ? clrBlue : clrRed);
-  DrawLabel(1, "Order" + objectLabels[1], StringFormat("Proj Loss: %.2f", orderSummary.loss), clrRed);
-  DrawLabel(2, "Order" + objectLabels[1] + "Perc", StringFormat("Proj Loss: %.1f%%", GetPercent(orderSummary.loss)), clrRed);
-  DrawLabel(3, "Order" + objectLabels[2], " ", clrBlack);
-  DrawLabel(4, "Order" + objectLabels[2] + "Perc", " ", clrBlack);
-  DrawLabel(5, "Order" + objectLabels[3], StringFormat("Proj Win: %.2f", orderSummary.profit), clrGreen);
-  DrawLabel(6, "Order" + objectLabels[3] + "Perc", StringFormat("Proj Win: %.1f%%", GetPercent(orderSummary.profit)), clrGreen);
-  DrawLabel(7, "Order" + objectLabels[4], StringFormat("W/O SL/TP: %.0f", orderSummary.withoutTpOrSl), clrGray);
-  DrawLabel(8, "Order" + objectLabels[5], "-=Ord sum=-", clrDarkBlue);
+  DrawLabel(0, "Order" + objectLabels[0], StringFormat("Proj Loss: %.2f", orderSummary.loss), clrRed);
+  DrawLabel(1, "Order" + objectLabels[1], StringFormat("Proj Loss: %.1f%%", GetPercent(orderSummary.loss)), clrRed);
+  DrawLabel(2, "Order" + objectLabels[2], " ", clrBlack);
+  DrawLabel(3, "Order" + objectLabels[3], " ", clrBlack);
+  DrawLabel(4, "Order" + objectLabels[4], StringFormat("Proj Win: %.2f", orderSummary.profit), clrGreen);
+  DrawLabel(5, "Order" + objectLabels[5], StringFormat("Proj Win: %.1f%%", GetPercent(orderSummary.profit)), clrGreen);
+  DrawLabel(6, "Order" + objectLabels[6], StringFormat("W/O SL/TP: %.0f", orderSummary.withoutTpOrSl), clrGray);
+  DrawLabel(7, "Order" + objectLabels[7], "-=Ord sum=-", clrDarkBlue);
 
   // position
-  DrawLabel(0, "Position" + objectLabels[0], StringFormat("Risk: %.2f%%", positionSummary.risk), positionSummary.risk < RedRiskLevel ? clrBlue : clrRed, 1);
-  DrawLabel(1, "Position" + objectLabels[1], StringFormat("Proj Loss: %.2f", positionSummary.loss), clrRed, 1);
-  DrawLabel(2, "Position" + objectLabels[1] + "Perc", StringFormat("Proj Loss: %.1f%%", GetPercent(positionSummary.loss)), clrRed, 1);
-  DrawLabel(3, "Position" + objectLabels[2], StringFormat("Cur Res: %.2f", positionSummary.currentResult), clrBlack, 1);
-  DrawLabel(4, "Position" + objectLabels[2] + "Perc", StringFormat("Cur Res: %.1f%%", GetPercent(positionSummary.currentResult)), clrBlack, 1);
-  DrawLabel(5, "Position" + objectLabels[3], StringFormat("Proj Win: %.2f", positionSummary.profit), clrGreen, 1);
-  DrawLabel(6, "Position" + objectLabels[3] + "Perc", StringFormat("Proj Win: %.1f%%", GetPercent(positionSummary.profit)), clrGreen, 1);
-  DrawLabel(7, "Position" + objectLabels[4], StringFormat("W/O SL/TP: %.0f", positionSummary.withoutTpOrSl), clrGray, 1);
-  DrawLabel(8, "Position" + objectLabels[5], "-=Pos sum=-", clrDarkBlue, 1);
+  DrawLabel(0, "Position" + objectLabels[0], StringFormat("Proj Loss: %.2f", positionSummary.loss), clrRed, 1);
+  DrawLabel(1, "Position" + objectLabels[1], StringFormat("Proj Loss: %.1f%%", GetPercent(positionSummary.loss)), clrRed, 1);
+  DrawLabel(2, "Position" + objectLabels[2], StringFormat("Cur Res: %.2f", positionSummary.currentResult), clrBlack, 1);
+  DrawLabel(3, "Position" + objectLabels[3], StringFormat("Cur Res: %.1f%%", GetPercent(positionSummary.currentResult)), GetPercent(positionSummary.currentResult) > 0 ? clrBlue : clrRed, 1);
+  DrawLabel(4, "Position" + objectLabels[4], StringFormat("Proj Win: %.2f", positionSummary.profit), clrGreen, 1);
+  DrawLabel(5, "Position" + objectLabels[5], StringFormat("Proj Win: %.1f%%", GetPercent(positionSummary.profit)), clrGreen, 1);
+  DrawLabel(6, "Position" + objectLabels[6], StringFormat("W/O SL/TP: %.0f", positionSummary.withoutTpOrSl), clrGray, 1);
+  DrawLabel(7, "Position" + objectLabels[7], "-=Pos sum=-", clrDarkBlue, 1);
 
   // combined
-  DrawLabel(0, "Summary" + objectLabels[0], StringFormat("Risk: %.2f%%", orderSummary.risk + positionSummary.risk), (orderSummary.risk + positionSummary.risk) < RedRiskLevel ? clrBlue : clrRed, 2);
-  DrawLabel(1, "Summary" + objectLabels[1], StringFormat("Proj Loss: %.2f", orderSummary.loss + positionSummary.loss), clrRed, 2);
-  DrawLabel(2, "Summary" + objectLabels[1] + "Perc", StringFormat("Proj Loss: %.1f%%", GetPercent(orderSummary.loss + positionSummary.loss)), clrRed, 2);
-  DrawLabel(3, "Summary" + objectLabels[2], " ", clrBlack, 2);
-  DrawLabel(4, "Summary" + objectLabels[2] + "Perc", " ", clrBlack, 2);
-  DrawLabel(5, "Summary" + objectLabels[3], StringFormat("Proj Win: %.2f", orderSummary.profit + positionSummary.profit), clrGreen, 2);
-  DrawLabel(6, "Summary" + objectLabels[3] + "Perc", StringFormat("Proj Win: %.1f%%", GetPercent(orderSummary.profit + positionSummary.profit)), clrGreen, 2);
-  DrawLabel(7, "Summary" + objectLabels[4], StringFormat("W/O SL/TP: %.0f", orderSummary.withoutTpOrSl + positionSummary.withoutTpOrSl), clrGray, 2);
-  DrawLabel(8, "Summary" + objectLabels[5], "-=Comb sum=-", clrDarkBlue, 2);
+  DrawLabel(0, "Summary" + objectLabels[0], StringFormat("Proj Loss: %.2f", orderSummary.loss + positionSummary.loss), clrRed, 2);
+  DrawLabel(1, "Summary" + objectLabels[1], StringFormat("Proj Loss: %.1f%%", GetPercent(orderSummary.loss + positionSummary.loss)), clrRed, 2);
+  DrawLabel(2, "Summary" + objectLabels[2], " ", clrBlack, 2);
+  DrawLabel(3, "Summary" + objectLabels[3], " ", clrBlack, 2);
+  DrawLabel(4, "Summary" + objectLabels[4], StringFormat("Proj Win: %.2f", orderSummary.profit + positionSummary.profit), clrGreen, 2);
+  DrawLabel(5, "Summary" + objectLabels[5], StringFormat("Proj Win: %.1f%%", GetPercent(orderSummary.profit + positionSummary.profit)), clrGreen, 2);
+  DrawLabel(6, "Summary" + objectLabels[6], StringFormat("W/O SL/TP: %.0f", orderSummary.withoutTpOrSl + positionSummary.withoutTpOrSl), clrGray, 2);
+  DrawLabel(7, "Summary" + objectLabels[7], "-=Comb sum=-", clrDarkBlue, 2);
 
   ChartRedraw();
 }
