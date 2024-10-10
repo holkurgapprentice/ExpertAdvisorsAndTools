@@ -5,227 +5,194 @@
 
 #include <Trade\Trade.mqh>
 
-CTrade c_trade;
-input bool InpDoOverwriteSl = false; // Stoplosses if found will be overwritten
+input bool InpDoOverwriteSl = false;          // Overwrite SL regardless if they are better found
+input bool InpOverwriteUsingAverages = false; // Overwrite SL using approx TP and Entry price to calc SL
+
+class PositionManager
+{
+private:
+    string mainSymbol;
+    double mainTpPrice;
+    double mainEntryPrice;
+    double calcSl;
+    double averageTpPrice;
+    double averageOpenPrice;
+    double averageCalcSl;
+    long mainType;
+    int tpsSetCount;
+    CTrade c_trade;
+
+public:
+    PositionManager(const string &symbol)
+        : mainSymbol(symbol), mainTpPrice(0), mainEntryPrice(0), calcSl(0),
+          averageTpPrice(0), averageOpenPrice(0), averageCalcSl(0), mainType(0), tpsSetCount(0) {}
+
+    void FindBestTp()
+    {
+        for (int i = PositionsTotal() - 1; i >= 0; --i)
+        {
+            ulong ticket = PositionGetTicket(i);
+            if (PositionGetSymbol(i) == mainSymbol)
+            {
+                double tpPrice = 0, entryPrice = 0;
+                long type = 0;
+
+                if (!PositionGetDouble(POSITION_TP, tpPrice) || tpPrice <= 0)
+                    continue;
+                if (!PositionGetInteger(POSITION_TYPE, type))
+                    continue;
+                if (!PositionGetDouble(POSITION_PRICE_OPEN, entryPrice))
+                    continue;
+
+                tpsSetCount++;
+                if (tpsSetCount == 1 || IsBetterTp(type, tpPrice))
+                {
+                    mainTpPrice = tpPrice;
+                    mainEntryPrice = entryPrice;
+                    mainType = type;
+                    calcSl = CalculateSl(mainEntryPrice, mainTpPrice, mainType);
+                }
+            }
+        }
+
+        if (mainTpPrice == 0)
+        {
+            Alert("No TP found");
+        }
+    }
+
+    void FindAverage()
+    {
+        double totalTpPrice = 0;
+        double totalOpenPrice = 0;
+
+        for (int i = PositionsTotal() - 1; i >= 0; --i)
+        {
+            ulong ticket = PositionGetTicket(i);
+            if (PositionGetSymbol(i) == mainSymbol)
+            {
+                double tpPrice = 0, entryPrice = 0, slPrice = 0;
+
+                if (!PositionGetDouble(POSITION_TP, tpPrice) || tpPrice <= 0)
+                    continue;
+                if (!PositionGetDouble(POSITION_PRICE_OPEN, entryPrice))
+                    continue;
+                if (!PositionGetDouble(POSITION_SL, slPrice))
+                    continue;
+
+                totalTpPrice += tpPrice;
+                totalOpenPrice += entryPrice;
+            }
+        }
+
+        if (tpsSetCount > 0)
+        {
+            averageTpPrice = totalTpPrice / tpsSetCount;
+            averageOpenPrice = totalOpenPrice / tpsSetCount;
+        }
+        else
+        {
+            Alert("No averages found");
+        }
+
+        averageCalcSl = CalculateSl(averageOpenPrice, averageTpPrice, mainType);
+    }
+
+    void ModifyPositions()
+    {
+        for (int i = PositionsTotal() - 1; i >= 0; --i)
+        {
+            ulong ticket = PositionGetTicket(i);
+            long positionType = 0;
+            double slPrice = 0;
+
+            if (!PositionGetInteger(POSITION_TYPE, positionType))
+                continue;
+            if (mainType != positionType)
+                continue;
+            if (PositionGetSymbol(i) != mainSymbol)
+                continue;
+            if (!PositionGetDouble(POSITION_SL, slPrice))
+                continue;
+
+            slPrice = AdjustSlPrice(slPrice, mainType, InpOverwriteUsingAverages ? averageCalcSl : calcSl);
+            c_trade.PositionModify(ticket, slPrice, mainTpPrice);
+        }
+    }
+
+    void ModifyOrders()
+    {
+        for (int i = OrdersTotal() - 1; i >= 0; --i)
+        {
+            ulong ticket = OrderGetTicket(i);
+            long positionType = 0;
+            double slPrice = 0, entryPrice = 0, stopLimitPrice = 0;
+            long expiration = 0;
+            string symbol;
+
+            if (!OrderGetInteger(ORDER_TYPE, positionType))
+                continue;
+            if (!OrderGetDouble(ORDER_SL, slPrice))
+                continue;
+            if (!OrderGetDouble(ORDER_PRICE_OPEN, entryPrice))
+                continue;
+            if (!OrderGetString(ORDER_SYMBOL, symbol))
+                continue;
+            if (symbol != mainSymbol)
+                continue;
+
+            slPrice = AdjustSlPrice(slPrice, mainType, calcSl);
+            if (!OrderGetInteger(ORDER_TIME_EXPIRATION, expiration))
+                continue;
+            if (!OrderGetDouble(ORDER_PRICE_STOPLIMIT, stopLimitPrice))
+                continue;
+
+            c_trade.OrderModify(ticket, entryPrice, slPrice, mainTpPrice, ORDER_TIME_GTC, expiration, stopLimitPrice);
+        }
+    }
+
+private:
+    bool IsBetterTp(long type, double tpPrice)
+    {
+        return (mainType == POSITION_TYPE_BUY && mainTpPrice < tpPrice) ||
+               (mainType == POSITION_TYPE_SELL && mainTpPrice > tpPrice);
+    }
+
+    double CalculateSl(double entryPrice, double tpPrice, long type)
+    {
+        return (type == POSITION_TYPE_BUY) ? entryPrice - (tpPrice - entryPrice) : entryPrice + (entryPrice - tpPrice);
+    }
+
+    double AdjustSlPrice(double currentSlPrice, long positionType, double calculatedSlPrice)
+    {
+        if (currentSlPrice != 0)
+        {
+            if ((positionType == POSITION_TYPE_BUY && currentSlPrice < calculatedSlPrice) ||
+                InpDoOverwriteSl)
+                return calculatedSlPrice;
+            if ((positionType == POSITION_TYPE_SELL && currentSlPrice > calculatedSlPrice) ||
+                InpDoOverwriteSl)
+                return calculatedSlPrice;
+        }
+        return currentSlPrice == 0 ? calculatedSlPrice : currentSlPrice;
+    }
+};
 
 //+------------------------------------------------------------------+
 //| Script program start function                                    |
 //+------------------------------------------------------------------+
 void OnStart()
 {
-  string mainSymbol = Symbol();
-  Print("symbol ", (string)mainSymbol);
+    string mainSymbol = Symbol();
+    Print("Symbol: ", mainSymbol);
 
-  double mainTpPrice = 0, mainEntryPrice = 0, tpPrice = 0, entryPrice = 0, slPrice = 0, calcSl = 0, stopLimitPrice = 0;
-  long mainType = 0, expiration = 0, type = 0;
-  int tpsSetCount = 0;
-  string symbol;
-
-  // find direction and tp
-  for (int i = PositionsTotal() - 1; i >= 0; --i)
-  {
-    ulong ticket = PositionGetTicket(i);
-    if (PositionGetSymbol(i) == mainSymbol)
+    PositionManager positionManager(mainSymbol);
+    positionManager.FindBestTp();
+    if (InpOverwriteUsingAverages)
     {
-
-      if (!PositionGetDouble(POSITION_TP, tpPrice) || tpPrice <= 0)
-        continue;
-
-      if (tpPrice > 0)
-        tpsSetCount++;
-
-      if (!PositionGetInteger(POSITION_TYPE, type))
-      {
-        Print("Failed to get type");
-        continue;
-      }
-
-      if (!PositionGetDouble(POSITION_PRICE_OPEN, entryPrice))
-      {
-        Print("Failed to get price open");
-        continue;
-      }
-
-      if (tpsSetCount == 1)
-      {
-        Print("Found tp ", (string)tpPrice);
-        mainTpPrice = tpPrice;
-        mainEntryPrice = entryPrice;
-        mainType = type;
-        if (mainType == POSITION_TYPE_BUY)
-        {
-          calcSl = mainEntryPrice - (mainTpPrice - mainEntryPrice);
-        }
-        if (mainType == POSITION_TYPE_SELL)
-        {
-          calcSl = mainEntryPrice + (mainEntryPrice - mainTpPrice);
-        }
-      }
-
-      if (tpsSetCount > 1)
-      {
-        // 0 - buy
-        if (mainType == POSITION_TYPE_BUY && mainTpPrice < tpPrice)
-        {
-          mainTpPrice = tpPrice;
-          mainEntryPrice = entryPrice;
-          mainType = type;
-          calcSl = mainEntryPrice - (mainTpPrice - mainEntryPrice);
-          Print("Better tp found");
-        }
-        // 1 - sell
-        if (mainType == POSITION_TYPE_SELL && mainTpPrice > tpPrice)
-        {
-          mainTpPrice = tpPrice;
-          mainEntryPrice = entryPrice;
-          mainType = type;
-          calcSl = mainEntryPrice + (mainEntryPrice - mainTpPrice);
-          Print("Better tp found");
-        }
-      }
-
-      Print("tp ", (string)mainTpPrice);
-      Print("entry  ", (string)mainEntryPrice);
-      Print("tps set  ", (string)tpsSetCount);
+        positionManager.FindAverage();
     }
-  }
-
-  if (mainTpPrice == 0)
-  {
-    Alert("No tp found");
-    return;
-  }
-
-  // modify sl and tp positions
-  for (int i = PositionsTotal() - 1; i >= 0; --i)
-  {
-    Print("Position number ", (string)i);
-    ulong ticket = PositionGetTicket(i);
-    if (!PositionGetInteger(POSITION_TYPE, type))
-    {
-      Print("Failed to get type");
-      continue;
-    }
-
-    if (mainType != type)
-    {
-      Print("Wrong type");
-      continue;
-    }
-
-    if (PositionGetSymbol(i) != mainSymbol)
-    {
-      Print("Wrong symbol skipping ", (string)PositionGetSymbol(i));
-      continue;
-    }
-
-    if (!PositionGetDouble(POSITION_SL, slPrice))
-    {
-      Print("Sl reading error");
-      continue;
-    }
-
-    if (slPrice != 0)
-    {
-      if ((mainType == POSITION_TYPE_BUY && slPrice < calcSl) || InpDoOverwriteSl)
-      {
-        slPrice = calcSl;
-      }
-      if ((mainType == POSITION_TYPE_SELL && slPrice > calcSl) || InpDoOverwriteSl)
-      {
-        slPrice = calcSl;
-      }
-    }
-
-    if (slPrice == 0)
-    {
-      slPrice = calcSl;
-    }
-
-    Print("Setting position sl tp");
-    c_trade.PositionModify(ticket, slPrice, mainTpPrice);
-  }
-
-  // MODIFY SL AND TP orders
-  for (int i = OrdersTotal() - 1; i >= 0; --i)
-  {
-
-    Print("Order number ", (string)i);
-    ulong ticket = OrderGetTicket(i);
-    if (!OrderGetInteger(ORDER_TYPE, type))
-    {
-      Print("Failed to get type");
-      continue;
-    }
-
-    if (mainType == POSITION_TYPE_BUY && (type != ORDER_TYPE_BUY_LIMIT && type != ORDER_TYPE_BUY_STOP))
-    {
-      Print("Wrong type ", (string)type);
-      continue;
-    }
-
-    if (mainType == POSITION_TYPE_SELL && (type != ORDER_TYPE_SELL_LIMIT && type != ORDER_TYPE_SELL_STOP))
-    {
-      Print("Wrong type ", (string)type);
-      continue;
-    }
-
-    if (!OrderGetDouble(ORDER_SL, slPrice))
-    {
-      Print("Sl reading error");
-      continue;
-    }
-
-    if (!OrderGetDouble(ORDER_PRICE_OPEN, entryPrice))
-    {
-      Print("Price open reading error");
-      continue;
-    }
-
-    if (!OrderGetString(ORDER_SYMBOL, symbol))
-    {
-      Print("Symbol reading error");
-      continue;
-    }
-
-    if (symbol != mainSymbol)
-    {
-      Print("Wrong symbol skipping ", (string)symbol);
-      continue;
-    }
-
-    if (slPrice != 0)
-    {
-
-      if (mainType == POSITION_TYPE_BUY && slPrice < calcSl)
-      {
-        slPrice = calcSl;
-      }
-      if (mainType == POSITION_TYPE_SELL && slPrice > calcSl)
-      {
-        slPrice = calcSl;
-      }
-    }
-
-    if (slPrice == 0)
-    {
-      slPrice = calcSl;
-    }
-
-    if (!OrderGetInteger(ORDER_TIME_EXPIRATION, expiration))
-    {
-      Print("Expiration reading error");
-      continue;
-    }
-
-    if (!OrderGetDouble(ORDER_PRICE_STOPLIMIT, stopLimitPrice))
-    {
-      Print("pric stoplimit reading error");
-      continue;
-    }
-
-    Print("Setting order sl tp");
-    c_trade.OrderModify(ticket, entryPrice, slPrice, mainTpPrice, ORDER_TIME_GTC, expiration, stopLimitPrice);
-  }
+    positionManager.ModifyPositions();
+    positionManager.ModifyOrders();
 }
 //+------------------------------------------------------------------+
