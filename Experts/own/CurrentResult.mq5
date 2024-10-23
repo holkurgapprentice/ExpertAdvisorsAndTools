@@ -24,7 +24,7 @@ input group "Colors"
 input color InpPresentBELineColor = clrGreen; // Break even line color
 input color InpPositiveColor = clrGreen; // TP color
 input color InpNeutralColor = clrBlack; // Neutral color
-input color InpBackgroundColor = clrSilver; // Background color
+input color InpBackgroundColor = clrLightSlateGray; // Background color
 input color InpBackgroundColor2 = clrDarkBlue; // Used for top labels
 input color InpPositiveCurrentColor = clrBlue; // Positive Current result
 input color InpNegativeColor = clrRed; // Negative color
@@ -47,7 +47,8 @@ struct SummaryDetail
   double currentResult;
   double profit;
   double loss;
-  int withoutTpOrSl;
+  int withoutTp;
+  int withoutSl;
   double risk;
 };
 
@@ -83,7 +84,8 @@ public:
     summary.currentResult = 0;
     summary.profit = 0;
     summary.loss = 0;
-    summary.withoutTpOrSl = 0;
+    summary.withoutTp = 0;
+    summary.withoutSl = 0;
     summary.risk = 0;
   }
 
@@ -135,7 +137,7 @@ public:
       }
       else
       {
-        orderSummary.withoutTpOrSl++;
+        orderSummary.withoutTp++;
       }
 
       double loss = 0;
@@ -147,7 +149,7 @@ public:
       }
       else
       {
-        orderSummary.withoutTpOrSl++;
+        orderSummary.withoutSl++;
       }
 
       double balance = AccountInfoDouble(ACCOUNT_BALANCE);
@@ -208,7 +210,7 @@ public:
       }
       else
       {
-        positionSummary.withoutTpOrSl++;
+        positionSummary.withoutTp++;
       }
 
       double loss = 0;
@@ -220,7 +222,7 @@ public:
       }
       else
       {
-        positionSummary.withoutTpOrSl++;
+        positionSummary.withoutSl++;
       }
 
       if (result != 0)
@@ -329,7 +331,7 @@ public:
     DrawLabel(3, "Order" + objectLabels[3], " ", InpNeutralColor);
     DrawLabel(4, "Order" + objectLabels[4], StringFormat("Proj Win: %.2f", orderSummary.profit), InpPositiveColor);
     DrawLabel(5, "Order" + objectLabels[5], StringFormat("Proj Win: %.1f%%", GetPercent(orderSummary.profit)), InpPositiveColor);
-    DrawLabel(6, "Order" + objectLabels[6], StringFormat("W/O SL/TP: %.0f", orderSummary.withoutTpOrSl), InpBackgroundColor);
+    DrawLabel(6, "Order" + objectLabels[6], StringFormat("W/O SL %.0f /TP: %.0f", orderSummary.withoutSl, orderSummary.withoutTp), InpBackgroundColor);
     DrawLabel(7, "Order" + objectLabels[7], "-=Ord sum=-", InpBackgroundColor2);
 
     // position
@@ -339,7 +341,7 @@ public:
     DrawLabel(3, "Position" + objectLabels[3], StringFormat("Cur Res: %.1f%%", GetPercent(positionSummary.currentResult)), GetPercent(positionSummary.currentResult) >= 0 ? InpPositiveCurrentColor : InpNegativeColor, 1);
     DrawLabel(4, "Position" + objectLabels[4], StringFormat("Proj Win: %.2f", positionSummary.profit), InpPositiveColor, 1);
     DrawLabel(5, "Position" + objectLabels[5], StringFormat("Proj Win: %.1f%%", GetPercent(positionSummary.profit)), InpPositiveColor, 1);
-    DrawLabel(6, "Position" + objectLabels[6], StringFormat("W/O SL/TP: %.0f", positionSummary.withoutTpOrSl), InpBackgroundColor, 1);
+    DrawLabel(6, "Position" + objectLabels[6], StringFormat("W/O SL %.0f /TP: %.0f", positionSummary.withoutSl, positionSummary.withoutTp), InpBackgroundColor, 1);
     DrawLabel(7, "Position" + objectLabels[7], "-=Pos sum=-", InpBackgroundColor2, 1);
 
     // combined
@@ -349,7 +351,7 @@ public:
     DrawLabel(3, "Summary" + objectLabels[3], " ", InpNeutralColor, 2);
     DrawLabel(4, "Summary" + objectLabels[4], StringFormat("Proj Win: %.2f", orderSummary.profit + positionSummary.profit), InpPositiveColor, 2);
     DrawLabel(5, "Summary" + objectLabels[5], StringFormat("Proj Win: %.1f%%", GetPercent(orderSummary.profit + positionSummary.profit)), InpPositiveColor, 2);
-    DrawLabel(6, "Summary" + objectLabels[6], StringFormat("W/O SL/TP: %.0f", orderSummary.withoutTpOrSl + positionSummary.withoutTpOrSl), InpBackgroundColor, 2);
+    DrawLabel(6, "Summary" + objectLabels[6], StringFormat("W/O SL %.0f /TP: %.0f", positionSummary.withoutSl + orderSummary.withoutSl, positionSummary.withoutTp + orderSummary.withoutTp), InpBackgroundColor, 2);
     DrawLabel(7, "Summary" + objectLabels[7], "-=Comb sum=-", InpBackgroundColor2, 2);
 
     ChartRedraw();
