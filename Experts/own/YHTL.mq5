@@ -27,7 +27,8 @@ input long InpMagicNumber = 813010;
 input LOT_MODE_ENUM InpLotMode = OFF;
 input double InpLots = 0.01;
 input int InpStopLoss = 1000;
-input int InpDaysExpiry = 3;                        // Days to expiry
+input int InpDaysToOrderExpiry = 3;                 // Days to order expiry
+input int InpDaysToPositionExpiry = 3;                 // Days to position expiry / 0=off
 input int InpFilterToCloseTransactions = 0;         // If distance from open to order is lower than this value don't send order
 input int InpFilterToFarTransactions = 0;           // If distance from open to order is higher than this value don't send order
 input int InpBreakEvenFromPoints = 0;               // Break event from N points; 0=off
@@ -56,7 +57,8 @@ int OnInit()
     
     bool initResult = true;
 
-	CheckInitResult(initResult, (InpDaysExpiry > 0), "Days to expiry should be greater than 0");
+	CheckInitResult(initResult, (InpDaysToOrderExpiry > 0), "Days to order expiry should be greater than 0");
+    CheckInitResult(initResult, (InpDaysToPositionExpiry >= 0), "Days to position expiry should be greater than 0");
 
 	if (initResult)
 	{
@@ -98,7 +100,7 @@ void OnTick()
     datetime previousDayTime = iTime(_Symbol, PERIOD_D1, 1);
     MqlDateTime previousDayTimeStruct;
     TimeToStruct(previousDayTime, previousDayTimeStruct);
-    datetime expiry = TimeCurrent() + (InpDaysExpiry * time_cycle);
+    datetime expiry = TimeCurrent() + (InpDaysToOrderExpiry * time_cycle);
     string description = GetDescriptionForTransaction(previousDayTimeStruct);
 
     double positionPrice = MathAbs(highPreviousDay - openPreviousDay) + lowPreviousDay;
@@ -415,7 +417,6 @@ bool CheckLots(double &lots)
 
 void ManageOpenPositionForeach()
 {
-
     int total = PositionsTotal();
     for (int i = total - 1; i >= 0; i--)
     {
@@ -447,6 +448,11 @@ void ManageOpenPositionForeach()
             if (InpTrailingStopAtrMultiplier > 0)
             {
                 SetTrailingStopAtr(ticket);
+            }
+
+            if (InpDaysToPositionExpiry > 0)
+            {
+                CloseExpiredPositions(ticket);
             }
 
             // end your stuff
@@ -595,4 +601,22 @@ void SetTrailingStopAtr(ulong ticket)
             return;
         }
     }
+}
+
+void CloseExpiredPositions(ulong ticket)
+{
+    datetime openTime = (datetime)PositionGetInteger(POSITION_TIME);
+    datetime currentTime = TimeCurrent();
+    if (DaysPassed(openTime, currentTime) >= InpDaysToPositionExpiry)
+    {
+        if(!trade.PositionClose(ticket))
+        {
+            Print("Failed to close position");
+        }
+    }
+}
+
+int DaysPassed(datetime openTime, datetime currentTime)
+{
+    return((int)MathRound((double)(currentTime - openTime) / 86400));
 }
