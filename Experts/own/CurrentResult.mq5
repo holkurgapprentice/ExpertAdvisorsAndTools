@@ -248,9 +248,9 @@ public:
       return;
 
     double totalBuySize = 0;
-    double totalBuyPrice = 0;
+    double totalBuyValue = 0; // Changed from totalBuyPrice to totalBuyValue
     double totalSellSize = 0;
-    double totalSellPrice = 0;
+    double totalSellValue = 0; // Changed from totalSellPrice to totalSellValue
 
     for (int i = PositionsTotal() - 1; i >= 0; i--)
     {
@@ -284,11 +284,11 @@ public:
         switch ((int)positionType)
         {
         case POSITION_TYPE_BUY:
-          totalBuyPrice += price * lots;
+          totalBuyValue += price * lots; // Calculate total value (price * lots)
           totalBuySize += lots;
           break;
         case POSITION_TYPE_SELL:
-          totalSellPrice += price * lots;
+          totalSellValue += price * lots; // Calculate total value (price * lots)
           totalSellSize += lots;
           break;
         default:
@@ -297,24 +297,36 @@ public:
       }
     }
 
-    if (totalBuySize > 0)
+    double breakEvenPrice = 0; // Initialize to 0 in case of no positions or net volume is zero
+
+    double netVolume = totalBuySize - totalSellSize;
+
+    if (netVolume != 0)
     {
-      totalBuyPrice /= totalBuySize;
+        breakEvenPrice = (totalBuyValue - totalSellValue) / netVolume;
+    }
+    else if (totalBuySize > 0 || totalSellSize > 0)
+    {
+        // If net volume is zero but there are positions, average all open positions.
+        // This is a fallback for edge cases where buy and sell volumes are exactly equal.
+        if (totalBuySize > 0) totalBuyValue /= totalBuySize; // Average buy price
+        if (totalSellSize > 0) totalSellValue /= totalSellSize; // Average sell price
+        breakEvenPrice = (totalBuyValue + totalSellValue) / (totalBuySize > 0 && totalSellSize > 0 ? 2 : (totalBuySize > 0 || totalSellSize > 0 ? 1 : 0)); // Average of averages, or single average if only buys or sells.
     }
 
-    if (totalSellSize > 0)
-    {
-      totalSellPrice /= totalSellSize;
-    }
 
-    double breakEvenPrice = (totalBuyPrice > 0 ? totalBuyPrice : totalSellPrice);
-    ObjectCreate(0, "BreakEven_Line", OBJ_HLINE, 0, 0, breakEvenPrice);
-    ObjectSetInteger(0, "BreakEven_Line", OBJPROP_COLOR, InpPresentBELineColor);
-    ObjectSetInteger(0, "BreakEven_Line", OBJPROP_WIDTH, 1);
-    ObjectSetInteger(0, "BreakEven_Line", OBJPROP_STYLE, STYLE_DASHDOTDOT);
-    ObjectSetInteger(0, "BreakEven_Line", OBJPROP_BACK, true);
-    string objectLabelBreakEvenLine = StringFormat(InpBELineLabel + " at %.5f", breakEvenPrice);
-    ObjectSetString(0, "BreakEven_Line", OBJPROP_TEXT, objectLabelBreakEvenLine);
+    if (breakEvenPrice > 0 || breakEvenPrice < 0) // Check if breakEvenPrice is meaningfully calculated. Handle 0 as no line needed if no positions or balanced positions
+    {
+        ObjectCreate(0, "BreakEven_Line", OBJ_HLINE, 0, 0, breakEvenPrice);
+        ObjectSetInteger(0, "BreakEven_Line", OBJPROP_COLOR, InpPresentBELineColor);
+        ObjectSetInteger(0, "BreakEven_Line", OBJPROP_WIDTH, 1);
+        ObjectSetInteger(0, "BreakEven_Line", OBJPROP_STYLE, STYLE_DASHDOTDOT);
+        ObjectSetInteger(0, "BreakEven_Line", OBJPROP_BACK, true);
+        string objectLabelBreakEvenLine = StringFormat(InpBELineLabel + " at %.5f", breakEvenPrice);
+        ObjectSetString(0, "BreakEven_Line", OBJPROP_TEXT, objectLabelBreakEvenLine);
+    } else {
+        ObjectDelete(0, "BreakEven_Line"); // Optionally delete the line if no meaningful BE price
+    }
   }
 };
 
