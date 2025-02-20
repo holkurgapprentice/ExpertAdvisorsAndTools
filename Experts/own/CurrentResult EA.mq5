@@ -1,12 +1,11 @@
 //+------------------------------------------------------------------+
-//|                                        CurrentResultIndicator.mq5 |
+//|                                             CurrentResult.mq5 |
 //|                                  Copyright 2024, MetaQuotes Ltd. |
 //|                                             https://www.mql5.com |
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2024, MetaQuotes Ltd."
 #property link "https://www.mql5.com"
 #property version "1.00"
-#property indicator_chart_window
 
 enum LayoutSize
 {
@@ -40,7 +39,6 @@ string objectLabels[] = {
     "CurrentResultPerc",
     "ProjWin",
     "ProjWinPerc",
-    "LotsBalance",
     "WithoutTpOrSl",
     "Label"};
 
@@ -49,7 +47,6 @@ struct SummaryDetail
   double currentResult;
   double profit;
   double loss;
-  double lotsBalance;
   int withoutTp;
   int withoutSl;
   double risk;
@@ -87,7 +84,6 @@ public:
     summary.currentResult = 0;
     summary.profit = 0;
     summary.loss = 0;
-    summary.lotsBalance = 0;
     summary.withoutTp = 0;
     summary.withoutSl = 0;
     summary.risk = 0;
@@ -130,11 +126,6 @@ public:
       {
         isBuy = (orderType == ORDER_TYPE_BUY || orderType == ORDER_TYPE_BUY_LIMIT ||
                  orderType == ORDER_TYPE_BUY_STOP || orderType == ORDER_TYPE_BUY_STOP_LIMIT);
-      }
-
-      if (lots != 0)
-      {
-        orderSummary.lotsBalance += (isBuy ? 1 : -1) * lots;
       }
 
       double profit = 0;
@@ -210,11 +201,6 @@ public:
         isBuy = (positionType == POSITION_TYPE_BUY);
       }
 
-      if (lots != 0)
-      {
-        positionSummary.lotsBalance += (isBuy ? 1 : -1) * lots;
-      }
-
       double profit = 0;
       if (tp != 0)
       {
@@ -262,9 +248,9 @@ public:
       return;
 
     double totalBuySize = 0;
-    double totalBuyValue = 0;
+    double totalBuyValue = 0; // Changed from totalBuyPrice to totalBuyValue
     double totalSellSize = 0;
-    double totalSellValue = 0;
+    double totalSellValue = 0; // Changed from totalSellPrice to totalSellValue
 
     for (int i = PositionsTotal() - 1; i >= 0; i--)
     {
@@ -356,9 +342,8 @@ public:
     DrawLabel(3, "Order" + objectLabels[3], " ", InpNeutralColor);
     DrawLabel(4, "Order" + objectLabels[4], StringFormat("Proj Win: %.2f", orderSummary.profit), InpPositiveColor);
     DrawLabel(5, "Order" + objectLabels[5], StringFormat("Proj Win: %.1f%%", GetPercent(orderSummary.profit)), InpPositiveColor);
-    DrawLabel(6, "Order" + objectLabels[6], StringFormat("Lots Bal: %.2f", orderSummary.lotsBalance), InpNeutralColor);
-    DrawLabel(7, "Order" + objectLabels[7], StringFormat("W/O SL %.0f /TP: %.0f", orderSummary.withoutSl, orderSummary.withoutTp), InpBackgroundColor);
-    DrawLabel(8, "Order" + objectLabels[8], "-=Ord sum=-", InpBackgroundColor2);
+    DrawLabel(6, "Order" + objectLabels[6], StringFormat("W/O SL %.0f /TP: %.0f", orderSummary.withoutSl, orderSummary.withoutTp), InpBackgroundColor);
+    DrawLabel(7, "Order" + objectLabels[7], "-=Ord sum=-", InpBackgroundColor2);
 
     // position
     DrawLabel(0, "Position" + objectLabels[0], StringFormat("Proj Loss: %.2f", positionSummary.loss), InpNegativeColor, 1);
@@ -367,9 +352,8 @@ public:
     DrawLabel(3, "Position" + objectLabels[3], StringFormat("Cur Res: %.1f%%", GetPercent(positionSummary.currentResult)), GetPercent(positionSummary.currentResult) >= 0 ? InpPositiveCurrentColor : InpNegativeColor, 1);
     DrawLabel(4, "Position" + objectLabels[4], StringFormat("Proj Win: %.2f", positionSummary.profit), InpPositiveColor, 1);
     DrawLabel(5, "Position" + objectLabels[5], StringFormat("Proj Win: %.1f%%", GetPercent(positionSummary.profit)), InpPositiveColor, 1);
-    DrawLabel(6, "Position" + objectLabels[6], StringFormat("Lots Bal: %.2f", positionSummary.lotsBalance), InpNeutralColor, 1);
-    DrawLabel(7, "Position" + objectLabels[7], StringFormat("W/O SL %.0f /TP: %.0f", positionSummary.withoutSl, positionSummary.withoutTp), InpBackgroundColor, 1);
-    DrawLabel(8, "Position" + objectLabels[8], "-=Pos sum=-", InpBackgroundColor2, 1);
+    DrawLabel(6, "Position" + objectLabels[6], StringFormat("W/O SL %.0f /TP: %.0f", positionSummary.withoutSl, positionSummary.withoutTp), InpBackgroundColor, 1);
+    DrawLabel(7, "Position" + objectLabels[7], "-=Pos sum=-", InpBackgroundColor2, 1);
 
     // combined
     DrawLabel(0, "Summary" + objectLabels[0], StringFormat("Proj Loss: %.2f", orderSummary.loss + positionSummary.loss), InpNegativeColor, 2);
@@ -378,9 +362,8 @@ public:
     DrawLabel(3, "Summary" + objectLabels[3], " ", InpNeutralColor, 2);
     DrawLabel(4, "Summary" + objectLabels[4], StringFormat("Proj Win: %.2f", orderSummary.profit + positionSummary.profit), InpPositiveColor, 2);
     DrawLabel(5, "Summary" + objectLabels[5], StringFormat("Proj Win: %.1f%%", GetPercent(orderSummary.profit + positionSummary.profit)), InpPositiveColor, 2);
-    DrawLabel(6, "Summary" + objectLabels[6], StringFormat("Lots Bal: %.2f", orderSummary.lotsBalance + positionSummary.lotsBalance), InpNeutralColor, 2);
-    DrawLabel(7, "Summary" + objectLabels[7], StringFormat("W/O SL %.0f /TP: %.0f", positionSummary.withoutSl + orderSummary.withoutSl, positionSummary.withoutTp + orderSummary.withoutTp), InpBackgroundColor, 2);
-    DrawLabel(8, "Summary" + objectLabels[8], "-=Comb sum=-", InpBackgroundColor2, 2);
+    DrawLabel(6, "Summary" + objectLabels[6], StringFormat("W/O SL %.0f /TP: %.0f", positionSummary.withoutSl + orderSummary.withoutSl, positionSummary.withoutTp + orderSummary.withoutTp), InpBackgroundColor, 2);
+    DrawLabel(7, "Summary" + objectLabels[7], "-=Comb sum=-", InpBackgroundColor2, 2);
 
     ChartRedraw();
   }
@@ -443,19 +426,22 @@ private:
 };
 
 //+------------------------------------------------------------------+
-//| Custom indicator initialization function                         |
+//| Expert initialization function                                   |
 //+------------------------------------------------------------------+
 int OnInit()
-  {
-   Logger::Log("Init");
-   return(INIT_SUCCEEDED);
-  }
+{
+  Logger::Log("Init");
+  EventSetTimer(3);
+  return (INIT_SUCCEEDED);
+}
+
 //+------------------------------------------------------------------+
-//| Custom indicator deinitialization function                       |
+//| Expert deinitialization function                                 |
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
 {
   Logger::Log("Deinit");
+  EventKillTimer();
   int Size = ArraySize(objectLabels);
   for (int i = 0; i < Size; i++)
   {
@@ -467,20 +453,18 @@ void OnDeinit(const int reason)
 }
 
 //+------------------------------------------------------------------+
-//| Custom indicator iteration function                              |
+//| Expert tick function                                             |
 //+------------------------------------------------------------------+
-int OnCalculate(const int rates_total,
-                const int prev_calculated,
-                const datetime &time[],
-                const double &open[],
-                const double &high[],
-                const double &low[],
-                const double &close[],
-                const long &tick_volume[],
-                const long &volume[],
-                const int &spread[])
-  {
-  Logger::Log("OnCalculate");
+void OnTick()
+{
+}
+
+//+------------------------------------------------------------------+
+//| Timer function                                                   |
+//+------------------------------------------------------------------+
+void OnTimer()
+{
+  Logger::Log("Timer hit");
 
   SummaryDetail orderSummary;
   SummaryDetail positionSummary;
@@ -491,7 +475,4 @@ int OnCalculate(const int rates_total,
   SummaryCalculator::CalculatePositionResults(positionSummary);
   BreakEvenCalculator::CalcBreakEven();
   DisplayManager::DisplayResults(orderSummary, positionSummary);
-
-  return(rates_total);
-  }
-//+------------------------------------------------------------------+
+}
